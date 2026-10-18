@@ -446,7 +446,7 @@ DWORD DosLoadExecutableInternal(IN DOS_EXEC_TYPE LoadType,
      * 0x5A4D 'ZM': new signature (stored as 0x4D, 0x5A)
      */
     ExeSignature = *(PWORD)ExeBuffer;
-    if (ExeSignature == 'MZ' || ExeSignature == 'ZM')
+    if (ExeSignature == 0x5A4D || ExeSignature == 0x4D5A)
     {
         /* EXE file */
         PIMAGE_DOS_HEADER Header;

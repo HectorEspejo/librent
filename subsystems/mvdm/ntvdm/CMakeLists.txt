@@ -79,7 +79,10 @@ set_target_properties(ntvdm
     DEFINE_SYMBOL "")
 
 add_pch(ntvdm ntvdm.h SOURCE)
-set_module_type(ntvdm win32cui UNICODE IMAGEBASE 0x0F000000)
+if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
+    target_compile_options(ntvdm PRIVATE -Wno-unused-but-set-global -Wno-multichar)
+endif()
+set_module_type(ntvdm win32cui UNICODE)
 target_link_libraries(ntvdm fast486 ${PSEH_LIB})
 add_importlibs(ntvdm user32 gdi32 advapi32 comdlg32 msvcrt kernel32 ntdll)
 add_cd_file(TARGET ntvdm DESTINATION reactos/system32 FOR all)

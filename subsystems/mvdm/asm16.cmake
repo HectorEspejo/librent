@@ -9,28 +9,6 @@ if(NOT MSVC)
 ### For GCC / Clang
 ###
 
-# Clang's LLVM integrated assembler does not emit 16-bit ELF relocations for
-# the i386-unknown-elf target (errors out on `mov bx, offset Sym`, `.word Sym`,
-# etc.), so route 16-bit MASM-style assembly through the i686 GNU `as` from
-# the RosBE GCC toolchain.
-if(CMAKE_C_COMPILER_ID STREQUAL "Clang" AND NOT ASM16_GAS)
-    set(_asm16_gas_hints "")
-    if(REACTOS_CLANG_GCC_TOOLCHAIN)
-        get_filename_component(_rosbe_mingw_root "${REACTOS_CLANG_GCC_TOOLCHAIN}" DIRECTORY)
-        list(APPEND _asm16_gas_hints
-            "${_rosbe_mingw_root}/i686-w64-mingw32/bin"
-            "${REACTOS_CLANG_GCC_TOOLCHAIN}/bin")
-    endif()
-    find_program(ASM16_GAS NAMES i686-w64-mingw32-as
-        HINTS ${_asm16_gas_hints})
-    if(NOT ASM16_GAS)
-        message(FATAL_ERROR
-            "asm16.cmake: cannot find i686-w64-mingw32-as for 16-bit MASM-style "
-            "assembly. Pass -DREACTOS_CLANG_GCC_TOOLCHAIN=<rosbe mingw-gcc dir> "
-            "or place i686-w64-mingw32-as on PATH.")
-    endif()
-endif()
-
 function(add_asm16_bin _target _binary_file _base_address)
     set(_concatenated_asm_file ${CMAKE_CURRENT_BINARY_DIR}/${_target}.asm)
     set(_preprocessed_file ${CMAKE_CURRENT_BINARY_DIR}/${_target}.pp.s)

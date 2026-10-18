@@ -312,6 +312,16 @@ config ENABLE_RTW8852BS
       Build the rtw8852bs Native 802.11 miniport for the Realtek RTL8852BS
       SDIO Wi-Fi chip, with its firmware.
 
+config ENABLE_NTVDM
+    prompt "NTVDM (DOS and 16-bit applications)"
+    type bool
+    default auto
+    depends ARCH=i386 || ARCH=amd64 || ARCH=arm64
+    help
+      Build NTVDM, the virtual DOS machine that runs DOS and 16-bit
+      applications on top of the Fast486 CPU emulator. "auto" enables it on
+      i386, amd64 and ARM64.
+
 config ENABLE_ROSV
     prompt "ROSV hypervisor (VMX)"
     type bool
@@ -529,6 +539,15 @@ config ENABLE_CPUBENCH_BOOT_RUN
     default n
     help
       Run the architecture-neutral CPU benchmark after desktop startup.
+
+config ENABLE_NTVDM_BOOT_RUN
+    prompt "Run the NTVDM test harness at boot"
+    type bool
+    default n
+    help
+      Install the librent NTVDM test harness and run it after desktop startup.
+      The harness looks for \LIBRENT\RUNTESTS.CMD on the test disk, runs the
+      DOS test corpus and reports the results over the debug port.
 
 config ENABLE_RP1GEM_BENCHMARK
     prompt "Run the RP1 GEM network benchmark at boot"

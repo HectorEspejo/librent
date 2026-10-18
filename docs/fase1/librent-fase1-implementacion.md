@@ -110,9 +110,21 @@
 | `subsystems/mvdm/ntvdm/CMakeLists.txt` | sin `IMAGEBASE`; supresiones de avisos de Clang del punto 2 de desviaciones |
 | `subsystems/mvdm/ntvdm/dos/dos32krnl/process.c` | firma MZ/ZM como palabra (desviación 3) |
 
-**Estado del repositorio:** cambios sin commitear a la espera de la
-confirmación del desarrollador (regla de la casa). `AGENTS.md` sin cambios
-frente a upstream.
+**Estado del repositorio:** los cambios están en cinco commits (formato de
+upstream, sin firma), subidos a `origin`:
+
+| Commit | Asunto |
+|---|---|
+| `464c9919119` | [DOCS] Add the librent working rules and phase 1 documentation |
+| `0ec7e70ee3d` | [LIBRENT] Start the fork at version 0.1.0 |
+| `09e788ca218` | [NTVDM] Restore the virtual DOS machine subsystem |
+| `655fcafbaf4` | [NTVDM] Build the restored subsystem with Clang and on 64-bit targets |
+| `b47b2ba37e2` | [CMAKE] Add the ENABLE_NTVDM build option |
+
+Se subieron `main` (al commit de upstream) y `fase1-ntvdm`, y se abrió la PR
+interna [#1](https://github.com/HectorEspejo/librent/pull/1) contra `main`
+del fork. `AGENTS.md` sin cambios frente a upstream. Los workflows `stale` y
+`labeler` quedaron `disabled_manually`; el workflow Build está activo.
 
 ## Decisiones técnicas tomadas durante el desarrollo
 
@@ -131,8 +143,8 @@ frente a upstream.
   de la casa.
 - **Anotación de la sincronización** con fecha y commit de upstream en este
   informe, tanto en el resumen como aquí: 18/10/2026, `97b438262df`.
-- **Sin push ni PR todavía:** los commits se preparan y se confirman con el
-  desarrollador, como acordado.
+- **Commits, push y PR hechos** con la confirmación del desarrollador; la PR
+  interna es la #1 del fork.
 
 ## Funcionalidades del checklist completadas
 
@@ -140,6 +152,7 @@ frente a upstream.
 - Remoto `upstream` apuntando a `ahmedarif193/LiberNT` y procedimiento de fusión semanal documentado en `CLAUDE.md`
 - Primera fusión de `upstream/main-nt10` hecha con el procedimiento documentado, con fecha y commit de upstream anotados en el informe de implementación
 - `gh repo set-default` apuntando al fork, para que ninguna PR vaya a `ahmedarif193/LiberNT`
+- `CLAUDE.md` en la raíz y documentación de la fase en `docs/`
 - `subsystems/mvdm` restaurado desde `054ce27^` con ntvdm, dos, config, pifmgr y vdmdbg, sin `wow16` ni `samples`
 - Opción `ENABLE_NTVDM` en el menú System de menuconfig con valor `auto`: activa en i386, amd64 y arm64, desactivada en riscv64 y ppc
 - `subsystems/CMakeLists.txt` incluye `mvdm` solo cuando `ENABLE_NTVDM` está activa, sin condición de compilador
@@ -153,13 +166,10 @@ frente a upstream.
 
 ## Pendientes y bloqueos
 
-- **Commits sin preparar y sin push**: los cambios están solo en el árbol de
-  trabajo local. CI, registro de workflows y PR quedan a la espera.
-- **GitHub Actions**: el fork tiene Actions activado pero ningún workflow
-  registrado aún (aparecerán al primer push). `stale` y `labeler` siguen sin
-  desactivar desde la configuración de GitHub.
-- **`CLAUDE.md` y `docs/`**: presentes en el árbol de trabajo, pendientes de
-  commit.
+- **CI del fork**: los workflows quedaron registrados con el push y `stale` y
+  `labeler` están `disabled_manually`; falta ver los 7 trabajos de `build.yml`
+  en verde (en el momento de escribir esto no se había disparado ninguna
+  ejecución; se está provocando con un push nuevo).
 - **S2 en adelante**: memoria reubicable y guarda, `BaseGetVdmConfigInfo` con
   reserva 0 (incluye la guarda en `proc.c` que se anotará como desviación),
   validación de punteros, arnés mínimo (`vmtest.py` + `ENABLE_NTVDM_BOOT_RUN` +

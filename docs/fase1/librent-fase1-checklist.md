@@ -7,7 +7,7 @@
   - AC: Dado el fork, cuando se sigue el procedimiento de `CLAUDE.md`, entonces la fusión termina sin pasos que no estén documentados
 - [ ] GitHub Actions activado en el fork, con `build.yml` ejecutándose en cada push y los workflows `stale` y `labeler` desactivados desde la configuración de GitHub (sin tocar sus ficheros)
 - [x] `gh repo set-default` apuntando al fork, para que ninguna PR vaya a `ahmedarif193/LiberNT`
-- [ ] `CLAUDE.md` en la raíz y documentación de la fase en `docs/`
+- [x] `CLAUDE.md` en la raíz y documentación de la fase en `docs/`
 - [ ] `LIBRENT_VERSION` en la raíz con la versión `0.1.0` al cerrar la fase
 - [ ] `NOVEDADES.md` en la raíz con la entrada de la versión `0.1.0`
 - [ ] Documentación de usuario en `docs/usuario/dos.md`: cómo ejecutar programas DOS, la ventana y sus atajos, y los límites de la Fase 1
@@ -158,6 +158,6 @@
 
 ---
 
-**Progreso Fase 1:** 14 / 122 funcionalidades
+**Progreso Fase 1:** 15 / 122 funcionalidades
 
-**Total librent (Fases 1-1):** 14 / 122 funcionalidades
+**Total librent (Fases 1-1):** 15 / 122 funcionalidades

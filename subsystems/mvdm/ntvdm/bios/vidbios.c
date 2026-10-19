@@ -33,7 +33,7 @@
 #include "io.h"
 #include "hardware/video/svga.h"
 /**/
-#include "../console/video.h"
+#include "../frontend/frontend.h"
 /**/
 
 /* PRIVATE VARIABLES **********************************************************/
@@ -3476,12 +3476,19 @@ VOID WINAPI VidBiosVideoService(LPWORD Stack)
                 case 0x00:
                 case 0x10: // FIXME: 0x1x performs a full mode reset
                 {
-                    // FIXME: BL == ??
+                    UCHAR Height = LOBYTE(getCX());
+                    UINT Count = HIBYTE(getCX());
+                    UINT First = getDX();
+                    PUCHAR FontData = (PUCHAR)FAR_POINTER(MAKELONG(getBP(), getES()));
 
-                    /* Write the default font to the VGA font plane */
-                    // VgaWriteTextModeFont(0, Font8x8, ARRAYSIZE(Font8x8) / VGA_FONT_CHARACTERS);
+                    if (Height == 0 || Height > VGA_MAX_FONT_HEIGHT ||
+                        Count == 0 || First + Count > VGA_FONT_CHARACTERS)
+                    {
+                        break;
+                    }
 
-                    UNIMPLEMENTED;
+                    /* Write the user font to the VGA font plane */
+                    VgaWriteTextModeFontRange(First, Count, Height, FontData);
                     break;
                 }
 

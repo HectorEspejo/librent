@@ -30,14 +30,14 @@
 - [ ] CI del fork en verde en los 7 trabajos de `build.yml`
 
 ## Memoria y 64 bits
-- [ ] Memoria del PC emulado (16 MB) reservada en cualquier dirección del proceso, nunca en la dirección 0
+- [x] Memoria del PC emulado (16 MB) reservada en cualquier dirección del proceso, nunca en la dirección 0
   - AC: Dada la VDM en amd64, cuando arranca, entonces `BaseAddress` es distinta de 0 y `hello.com` funciona
-- [ ] `BaseGetVdmConfigInfo` devuelve una reserva de tamaño 0 y kernel32 no reserva nada en el proceso hijo
-- [ ] `ntoskrnl/nvs` sin ningún cambio
-- [ ] 64 KB de guarda sin acceso detrás de la memoria del invitado
-- [ ] Conversiones de dirección del invitado a puntero del host (BOP, BIOS y DOS) validadas contra el tamaño de la memoria del invitado
+- [x] `BaseGetVdmConfigInfo` devuelve una reserva de tamaño 0 y kernel32 no reserva nada en el proceso hijo
+- [x] `ntoskrnl/nvs` sin ningún cambio
+- [x] 64 KB de guarda sin acceso detrás de la memoria del invitado
+- [x] Conversiones de dirección del invitado a puntero del host (BOP, BIOS y DOS) validadas contra el tamaño de la memoria del invitado
   - AC: Dado un programa que pide a INT 21h leer en un búfer que cruza el final de la memoria del invitado, cuando se ejecuta, entonces la llamada falla con error DOS y la VDM sigue funcionando
-- [ ] Comprobación de `VdmAllowed` (`ProcessWx86Information`) mantenida al arrancar `ntvdm.exe`
+- [x] Comprobación de `VdmAllowed` (`ProcessWx86Information`) mantenida al arrancar `ntvdm.exe`
 
 ## Ventana de la VDM
 - [ ] Frontend de consola (`console/console.c`, `console/video.c`) eliminado y sustituido por el frontend de ventana en `ntvdm/frontend/`
@@ -76,14 +76,14 @@
 - [ ] Pegar: texto del portapapeles convertido a CP437 e inyectado en el búfer de teclado de la BIOS a medida que se vacía
 
 ## Integración con el sistema
-- [ ] Un `.COM` o `.EXE` de DOS lanzado desde cmd se ejecuta en una VDM y cmd espera a que termine
+- [x] Un `.COM` o `.EXE` de DOS lanzado desde cmd se ejecuta en una VDM y cmd espera a que termine
 - [ ] Doble clic en un `.COM` o `.EXE` de DOS en el Explorador lo ejecuta en una VDM
 - [ ] El código de salida del programa DOS llega a cmd como ERRORLEVEL
   - AC: Dado `exitcode.com 7`, cuando termina, entonces `echo %errorlevel%` muestra 7
 - [ ] Redirección de salida (`>` y `>>`) de un programa DOS a fichero
 - [ ] Redirección de entrada (`<`) y tuberías (`|`) con programas DOS
   - AC: Dado `type datos.txt | stdio.com > salida.txt`, cuando termina, entonces `salida.txt` contiene el texto de entrada en mayúsculas
-- [ ] VDM efímera: ejecuta las órdenes pendientes de su consola y termina cuando no le quedan, sin quedar residente
+- [x] VDM efímera: ejecuta las órdenes pendientes de su consola y termina cuando no le quedan, sin quedar residente
   - AC: Dado `hello.com` lanzado dos veces seguidas desde cmd, cuando terminan, entonces no queda ningún `ntvdm.exe` en ejecución
 - [ ] Un programa DOS que lanza otro programa DOS (INT 21h 4Bh) lo ejecuta en la misma VDM y recibe su código de salida
 - [ ] Un programa DOS que lanza un programa Win32 lo ejecuta y espera a que termine
@@ -94,7 +94,7 @@
 - [ ] El programa DOS recibe las variables de entorno de cmd, con rutas cortas
 
 ## DOS y hardware emulado
-- [ ] COMMAND.COM integrado ejecuta el programa pedido y devuelve su código de salida
+- [x] COMMAND.COM integrado ejecuta el programa pedido y devuelve su código de salida
 - [ ] INT 21h de ficheros (crear, abrir, leer, escribir, mover el puntero, cerrar, borrar, renombrar, atributos) sobre NTFS y FAT
 - [ ] INT 21h de directorios (crear, borrar, cambiar, obtener el actual) y búsqueda FindFirst/FindNext con nombres 8.3
 - [ ] Comprobado si el NTFS de LiberNT entrega nombres cortos 8.3, con el resultado anotado en el informe de implementación
@@ -111,10 +111,10 @@
 - [ ] `CONFIG.NT` y `AUTOEXEC.NT` instalados en `system32` (su interpretación es de la Fase 2)
 
 ## Pruebas y rendimiento
-- [ ] `scripts/librent/vmtest.py` en Python 3 sin dependencias externas, con las órdenes `payload`, `run`, `report` y `all`
-- [ ] `vmtest.py run` arranca `LiberNT.img` en QEMU/KVM sin pantalla, con `-snapshot`, salida serie a fichero, QMP y el disco de pruebas como segunda unidad
-- [ ] Opción `ENABLE_NTVDM_BOOT_RUN` (solo Debug) que al iniciar sesión busca `\LIBRENT\RUNTESTS.CMD` de C: a Z: y lo ejecuta
-- [ ] `vmtestmark.exe` emite las marcas `LIBRENT-VMTEST-KEYS` y `LIBRENT-VMTEST-DONE` por la salida de depuración hacia el puerto serie
+- [x] `scripts/librent/vmtest.py` en Python 3 sin dependencias externas, con las órdenes `payload`, `run`, `report` y `all`
+- [x] `vmtest.py run` arranca `LiberNT.img` en QEMU/KVM sin pantalla, con `-snapshot`, salida serie a fichero, QMP y el disco de pruebas como segunda unidad
+- [x] Opción `ENABLE_NTVDM_BOOT_RUN` (solo Debug) que al iniciar sesión busca `\LIBRENT\RUNTESTS.CMD` de C: a Z: y lo ejecuta
+- [x] `vmtestmark.exe` emite las marcas `LIBRENT-VMTEST-KEYS` y `LIBRENT-VMTEST-DONE` por la salida de depuración hacia el puerto serie
 - [ ] Programas de prueba propios en `modules/rostests/tests/ntvdm16/`: hello, exitcode, stdio, filetest, memtest, xmstest, emstest, mousetest, speaker, idle, keytest, textmodes y bench16
 - [ ] Corpus externo en `scripts/librent/corpus/manifest.json` con EDIT, MEM, FIND, MORE, SORT, CHOICE y TREE de FreeDOS, cada uno con URL, SHA-256 y licencia, y binarios en una caché fuera del repo
   - AC: Dado un SHA-256 que no coincide, cuando se ejecuta `vmtest.py payload`, entonces el elemento se rechaza y la orden termina con error
@@ -124,7 +124,7 @@
 - [ ] Estadísticas al terminar: instrucciones, MIPS, tiempos de CPU y de reloj, reposo, arranque y eventos del altavoz
 - [ ] Modo sin diálogos para pruebas: los avisos van a stderr y a las estadísticas, y cerrar no pide confirmación
 - [ ] Teclas inyectadas por QMP en las pruebas interactivas (EDIT y keytest)
-- [ ] `vmtest.py report` compara con las referencias, imprime una tabla y sale con error si alguna prueba falla
+- [x] `vmtest.py report` compara con las referencias, imprime una tabla y sale con error si alguna prueba falla
 - [ ] Medición de Fast486 con `bench16` en amd64 sobre QEMU/KVM, con MIPS medios y su clasificación según §7.8 anotados en el informe de implementación
 - [ ] Arranque de la VDM por debajo de 2 s (`startup_ms` de `hello`) en amd64 Debug sobre QEMU/KVM
 - [ ] Todas las pruebas automáticas en verde en amd64 Debug con Clang
@@ -151,13 +151,13 @@
 - [ ] `NTVDM_STATS` escribe el fichero de estadísticas
 - [ ] `NTVDM_SCREEN_DUMP` y `NTVDM_SCREEN_DUMP_MS` escriben los volcados de pantalla
 - [ ] `NTVDM_NO_DIALOGS` desactiva los diálogos
-- [ ] `vmtest.py payload`
-- [ ] `vmtest.py run`
-- [ ] `vmtest.py report`
-- [ ] `vmtest.py all`
+- [x] `vmtest.py payload`
+- [x] `vmtest.py run`
+- [x] `vmtest.py report`
+- [x] `vmtest.py all`
 
 ---
 
-**Progreso Fase 1:** 15 / 122 funcionalidades
+**Progreso Fase 1:** 33 / 122 funcionalidades
 
-**Total librent (Fases 1-1):** 15 / 122 funcionalidades
+**Total librent (Fases 1-1):** 33 / 122 funcionalidades

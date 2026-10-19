@@ -2,7 +2,7 @@
 
 ## Informe de implementación
 
-**Última actualización:** 18/10/2026 (sesión 1: S0 y S1)
+**Última actualización:** 18/10/2026 (sesión 2: S2)
 
 ---
 
@@ -57,6 +57,57 @@
   `system32`, y CONFIG/AUTOEXEC también en `repair`).
 - `IMAGEBASE 0x0F000000` eliminada de la definición del módulo `ntvdm`.
 
+### S2 · 64 bits y primer arranque
+
+- **Memoria del invitado reubicable**: `MemInitialize` reserva 16 MB + 64 KB de
+  guarda en cualquier dirección (`BaseAddress` nunca 0) y confirma solo los
+  16 MB con `PAGE_EXECUTE_READWRITE`; la guarda queda reservada e inaccesible.
+  Evidencia en el log serie del arnés: `NTVDM: Guest memory at
+  000000BB25610000, guard at 000000BB26610000`.
+- **Validación de conversiones invitado→host**: nueva
+  `MemIsValidAddress(Address, Size)` (verificación de rango contra
+  `MAX_ADDRESS`, sin desbordes). Se aplica en la E/S de ficheros DOS
+  (`DosReadFile`/`DosWriteFile`), en las transferencias del BIOS de disco
+  (`ReadDisk`/`WriteDisk`) y en `MGetVdmPointer` (ruta BOP/VDD).
+- **`BaseGetVdmConfigInfo`**: devuelve reserva 0 y falla con
+  `ERROR_BAD_EXE_FORMAT` si `system32\ntvdm.exe` no existe. La línea de
+  comandos usa la ruta ya compuesta del ejecutable. En `proc.c` se añadió la
+  guarda para que el contador de reserva no desborde con tamaño 0.
+- **Emparejamiento VDM ↔ consola (riesgo R-02)**: con condrv los valores de
+  handle de consola difieren entre procesos (cmd 0x2C, ntvdm 0x04), así que la
+  búsqueda por handle fallaba con `ERROR_NOT_FOUND`. Ahora basesrv asigna un
+  identificador de sesión a **toda** VDM (no solo a las sin consola), kernel32
+  lo pasa siempre con `-i<sesión>` y la VDM se identifica por sesión; además
+  basesrv registra el PID de la VDM y lo usa como respaldo en las llamadas que
+  solo llevan handle de consola (`ExitVDM`, contador de reentrada, directorios
+  actuales). `dem.c` distingue «tiene consola» (para el arranque del COMSPEC
+  de 32 bits y el título) del identificador de sesión.
+- **VDM efímera**: corregido el tratamiento de `VDM_FLAG_DONT_WAIT` en basesrv
+  (antes devolvía igualmente el evento de espera, y la VDM quedaba bloqueada
+  hasta la siguiente orden). Ahora, al terminar un programa sin órdenes
+  pendientes, la VDM sale; cada orden nueva lanza su propia VDM. Verificado:
+  dos ejecuciones seguidas dejan dos VDM que terminan, sin residuos.
+- **Redirección**: se eliminó el forzado `bInheritHandles = FALSE` de la ruta
+  VDM en `proc.c`, de modo que la VDM hereda los handles estándar de cmd y la
+  E/S DOS se enlaza con el fichero o tubería de la orden.
+- **Arnés de pruebas**:
+  - `scripts/librent/vmtest.py` (Python 3, solo biblioteca estándar) con las
+    órdenes `payload`, `run`, `report` y `all`.
+  - `ENABLE_NTVDM_BOOT_RUN` instala `vmtestmark.exe` y
+    `librent-vmtest.cmd` en `system32` y registra la entrada `Run` de HKCU;
+    busca `\LIBRENT\RUNTESTS.CMD` de C: a Z: y lo ejecuta.
+  - Añade `/DEBUG /DEBUGPORT=COM1 /BAUDRATE=115200` a las opciones de arranque
+    de la imagen preinstalada, para que las marcas del arnés lleguen al log
+    serie.
+  - Programas propios `hello.com` y `oobread.com` (ensamblador integrado de
+    Clang) y `vmtestmark.exe` en `modules/rostests/tests/ntvdm16/`.
+  - Disco de pruebas FAT32 creado con `mtools`; QEMU/KVM sin pantalla, serie a
+    fichero, QMP y el disco de pruebas como segunda unidad IDE.
+  - **Resultado: `vmtest.py all` en verde (2/2)** con hello.com redirigido y
+    oobread.com en el borde de la memoria direccionable.
+- Comprobación de `VdmAllowed` mantenida en `wmain`; `ntoskrnl/nvs` sin
+  cambios.
+
 ## Desviaciones respecto a la especificación (qué y por qué)
 
 1. **Documentación en `docs/fase1/` y no en `docs/` raíz.** Decisión del
@@ -82,6 +133,45 @@
 5. **`sdk/cmake/config.cmake` y `rosconfig.def`** son ficheros de upstream
    listados en §2.3 del informe, así que los cambios están dentro de lo
    previsto; se citan aquí por trazabilidad.
+6. **`dll/win32/kernel32/client/proc.c`** (fichero no listado en §2.3): dos
+   cambios mínimos exigidos por la fase. (a) La guarda `if (VdmReserve)
+   VdmReserve--;` en las dos ramas VDM, sin la cual el contador desborda si
+   `BaseGetVdmConfigInfo` devuelve reserva 0. (b) Se deja de forzar
+   `bInheritHandles = FALSE` en la rama DOS para que la redirección de cmd
+   llegue a la VDM (sin ello, la salida DOS va siempre al CON).
+7. **`subsystems/win/basesrv/vdm.c`** (fichero no listado en §2.3): asignación
+   de identificador de sesión a toda VDM, emparejamiento de respaldo por PID
+   del cliente y corrección de `VDM_FLAG_DONT_WAIT` (antes devolvía el evento
+   de espera aunque el llamante pidiera respuesta inmediata, lo que impedía la
+   VDM efímera). Son cambios de contrato interno CSR, no de ABI pública.
+8. **`boot/boot_images.cmake`** (fichero contemplado en §2.3 como «fichero que
+   activa las opciones `*_BOOT_RUN`»): con `ENABLE_NTVDM_BOOT_RUN` añade
+   `/DEBUG /DEBUGPORT=COM1 /BAUDRATE=115200` a las opciones de arranque de la
+   imagen preinstalada mediante el mecanismo existente
+   `FREELDR_PREINSTALL_OPTIONS`.
+9. **Arnés dentro de la zona del fork**: el subdirectorio de pruebas se añade
+   desde `subsystems/mvdm/CMakeLists.txt` cuando `ENABLE_NTVDM_BOOT_RUN` está
+   activa, sin tocar `modules/rostests/tests/CMakeLists.txt` (upstream).
+10. **AC de validación de punteros no ejercitable en modo real.** La
+    comprobación «INT 21h lee en un búfer que cruza el final de la memoria del
+    invitado» no es alcanzable desde código de 16 bits: con segmento y
+    desplazamiento de 16 bits la dirección lineal máxima es `0x10FFEF` y el
+    contador máximo `0xFFFF`, así que ningún búfer real-mode puede acercarse a
+    los 16 MB (`0x1000000`). La validación está implementada y en uso (DOS,
+    BIOS y ruta BOP/VDD), y `oobread.com` comprueba el borde alcanzable
+    (`FFFF:FFF0` + 32 bytes). Se pone en conocimiento del analista para que
+    confirme la AC o la reformule; una ejercitación negativa requeriría una
+    interfaz de 32 bits (Fase 3/DPMI).
+11. **`vmtest.py run` usa instantánea por unidad** (`snapshot=on` en el disco
+    del sistema, el de pruebas sin instantánea) en lugar del `-snapshot`
+    global, que descartaría también los `TEST_RESULT` escritos en el disco de
+    pruebas. Es la intención del criterio (no modificar `LiberNT.img`).
+12. **`subsystems/mvdm/ntvdm/console/console.c`**: los bucles
+    `while (ShowConsoleCursor(...) >= 0) ;` del frontend de consola heredado
+    bloqueaban el arranque de la VDM (el stub actual de `ShowConsoleCursor`
+    devuelve −1 y el bucle «mostrar cursor» no terminaba nunca). Se sustituyen
+    por una llamada única. Este fichero desaparece en S3 con el frontend de
+    ventana, así que el cambio es un puente mínimo para poder validar S2.
 
 ## Estructura de archivos creada/modificada
 
@@ -92,6 +182,14 @@
 | `LIBRENT_VERSION` | `0.1.0` (versión de la fase, aún en desarrollo) |
 | `NOVEDADES.md` | Entrada 0.1.0 en lenguaje de usuario (borrador) |
 | `docs/fase1/librent-fase1-implementacion.md` | Este informe |
+| `scripts/librent/vmtest.py` | Arnés: `payload`, `run`, `report`, `all` |
+| `scripts/librent/librent-vmtest.cmd` | Busca `\LIBRENT\RUNTESTS.CMD` de C: a Z: y lo ejecuta |
+| `scripts/librent/corpus/manifest.json` | `CORPUS_ITEM` propios (hello, oobread) |
+| `scripts/librent/corpus/golden/own-hello.out`, `own-oobread.out` | Salidas de referencia |
+| `modules/rostests/tests/ntvdm16/CMakeLists.txt` | hello.com, oobread.com, vmtestmark.exe |
+| `modules/rostests/tests/ntvdm16/hello.S`, `oobread.S` | Programas de 16 bits |
+| `modules/rostests/tests/ntvdm16/vmtestmark.c` | Marcas `LIBRENT-VMTEST-KEYS`/`-DONE` |
+| `modules/rostests/tests/ntvdm16/librent-vmtest.inf` | Entrada `Run` de HKCU |
 
 **Modificados (ficheros de upstream listados en §2.3):**
 
@@ -110,6 +208,21 @@
 | `subsystems/mvdm/ntvdm/CMakeLists.txt` | sin `IMAGEBASE`; supresiones de avisos de Clang del punto 2 de desviaciones |
 | `subsystems/mvdm/ntvdm/dos/dos32krnl/process.c` | firma MZ/ZM como palabra (desviación 3) |
 
+**Modificados en S2 (fuera de §2.3, desviaciones 6–9):**
+
+| Fichero | Cambio |
+|---|---|
+| `dll/win32/kernel32/client/vdm.c` | reserva 0 y `ERROR_BAD_EXE_FORMAT` si falta `ntvdm.exe` |
+| `dll/win32/kernel32/client/proc.c` | guarda de `VdmReserve`; herencia de handles en la rama DOS |
+| `subsystems/win/basesrv/vdm.c` | sesión por VDM, respaldo por PID, `DONT_WAIT` |
+| `boot/boot_images.cmake` | opciones de depuración de la imagen con `ENABLE_NTVDM_BOOT_RUN` |
+| `subsystems/mvdm/CMakeLists.txt` | añade `modules/rostests/tests/ntvdm16` con el arnés |
+| `subsystems/mvdm/ntvdm/memory.c`, `emulator.h` | memoria reubicable, guarda, `MemIsValidAddress` |
+| `subsystems/mvdm/ntvdm/dos/dos32krnl/dosfiles.c` | validación del búfer DOS |
+| `subsystems/mvdm/ntvdm/hardware/disk.c` | validación del búfer del BIOS de disco |
+| `subsystems/mvdm/ntvdm/dos/dem.c` | `HasConsole`, `TaskId` de sesión, VDM efímera |
+| `subsystems/mvdm/ntvdm/console/console.c` | sin bucles de reintento infinitos de `ShowConsoleCursor` (desviación 12) |
+
 **Estado del repositorio:** los cambios están en cinco commits (formato de
 upstream, sin firma), subidos a `origin`:
 
@@ -125,6 +238,9 @@ Se subieron `main` (al commit de upstream) y `fase1-ntvdm`, y se abrió la PR
 interna [#1](https://github.com/HectorEspejo/librent/pull/1) contra `main`
 del fork. `AGENTS.md` sin cambios frente a upstream. Los workflows `stale` y
 `labeler` quedaron `disabled_manually`; el workflow Build está activo.
+
+Los cambios de S2 están en el árbol de trabajo, **sin commitear**, a la espera
+de la confirmación del desarrollador.
 
 ## Decisiones técnicas tomadas durante el desarrollo
 
@@ -145,6 +261,33 @@ del fork. `AGENTS.md` sin cambios frente a upstream. Los workflows `stale` y
   informe, tanto en el resumen como aquí: 18/10/2026, `97b438262df`.
 - **Commits, push y PR hechos** con la confirmación del desarrollador; la PR
   interna es la #1 del fork.
+- **Memoria del invitado reubicable**: la reserva se hace con base `NULL` y se
+  exige que el sistema no la sitúe en 0; la guarda de 64 KB se reserva en la
+  misma operación y solo se confirman los 16 MB, de modo que queda inaccesible
+  sin necesidad de protegerla después.
+- **Identificación de la VDM por sesión, no por handle de consola**: con
+  condrv los valores de handle dejan de ser comparables entre procesos
+  (hecho comprobado: 0x2C en cmd y 0x04 en ntvdm). Se mantiene el handle para
+  lo que sí es válido (los registros por consola del proceso que lanza) y se
+  usa la sesión (y el PID como respaldo) para las llamadas de la propia VDM.
+- **«Tiene consola» como concepto separado del identificador de sesión**:
+  `dem.c` decide con `GetConsoleWindow()` si debe arrancar el COMSPEC de 32
+  bits y poner título, en lugar de con `SessionId != 0`, que ahora siempre es
+  cierto en la práctica.
+- **VDM efímera estricta**: al terminar un programa sin órdenes pendientes la
+  VDM sale y cmd lanza otra para la siguiente orden. Es lo que da redirección
+  correcta por orden (cada VDM hereda los handles de su comando) y cumple la
+  promesa de no dejar procesos residentes.
+- **Validación central de direcciones** (`MemIsValidAddress`) en lugar de
+  comprobaciones ad hoc: se aplica en los tres puntos de conversión masiva
+  (DOS, BIOS y BOP/VDD) y devuelve error del invitado sin tocar memoria del
+  host.
+- **El subdirectorio de pruebas se engancha desde `subsystems/mvdm`** (zona
+  del fork) y solo con `ENABLE_NTVDM_BOOT_RUN`, para no tocar el árbol de
+  tests de upstream y no engordar las imágenes normales.
+- **Las marcas del arnés se emiten con `OutputDebugStringA`** y llegan a COM1
+  gracias a `/DEBUG /DEBUGPORT=COM1 /BAUDRATE=115200`, horneado en la imagen
+  solo cuando `ENABLE_NTVDM_BOOT_RUN` está activa.
 
 ## Funcionalidades del checklist completadas
 
@@ -163,17 +306,44 @@ del fork. `AGENTS.md` sin cambios frente a upstream. Los workflows `stale` y
 - Ningún `#ifdef` de arquitectura nuevo en `subsystems/mvdm` ni en `sdk/lib/fast486`
 - `IMAGEBASE` fija eliminada de la definición del módulo `ntvdm`
 - `ntvdm.exe`, `command.com`, `pifmgr.dll`, `vdmdbg.dll`, `CONFIG.NT` y `AUTOEXEC.NT` incluidos en `bootcd.iso`, `LiberNT.img` y `LiberNT.vhd`
+- Memoria del PC emulado (16 MB) reservada en cualquier dirección del proceso, nunca en la dirección 0
+- `BaseGetVdmConfigInfo` devuelve una reserva de tamaño 0 y kernel32 no reserva nada en el proceso hijo
+- `ntoskrnl/nvs` sin ningún cambio
+- 64 KB de guarda sin acceso detrás de la memoria del invitado
+- Conversiones de dirección del invitado a puntero del host (BOP, BIOS y DOS) validadas contra el tamaño de la memoria del invitado
+- Comprobación de `VdmAllowed` (`ProcessWx86Information`) mantenida al arrancar `ntvdm.exe`
+- `scripts/librent/vmtest.py` en Python 3 sin dependencias externas, con las órdenes `payload`, `run`, `report` y `all`
+- `vmtest.py run` arranca `LiberNT.img` en QEMU/KVM sin pantalla, con `-snapshot`, salida serie a fichero, QMP y el disco de pruebas como segunda unidad
+- Opción `ENABLE_NTVDM_BOOT_RUN` (solo Debug) que al iniciar sesión busca `\LIBRENT\RUNTESTS.CMD` de C: a Z: y lo ejecuta
+- `vmtestmark.exe` emite las marcas `LIBRENT-VMTEST-KEYS` y `LIBRENT-VMTEST-DONE` por la salida de depuración hacia el puerto serie
+- `vmtest.py report` compara con las referencias, imprime una tabla y sale con error si alguna prueba falla
+- Un `.COM` o `.EXE` de DOS lanzado desde cmd se ejecuta en una VDM y cmd espera a que termine
+- VDM efímera: ejecuta las órdenes pendientes de su consola y termina cuando no le quedan, sin quedar residente
+- COMMAND.COM integrado ejecuta el programa pedido y devuelve su código de salida
+- `vmtest.py payload`
+- `vmtest.py run`
+- `vmtest.py report`
+- `vmtest.py all`
 
 ## Pendientes y bloqueos
 
 - **CI del fork**: los workflows quedaron registrados con el push y `stale` y
-  `labeler` están `disabled_manually`; falta ver los 7 trabajos de `build.yml`
-  en verde (en el momento de escribir esto no se había disparado ninguna
-  ejecución; se está provocando con un push nuevo).
-- **S2 en adelante**: memoria reubicable y guarda, `BaseGetVdmConfigInfo` con
-  reserva 0 (incluye la guarda en `proc.c` que se anotará como desviación),
-  validación de punteros, arnés mínimo (`vmtest.py` + `ENABLE_NTVDM_BOOT_RUN` +
-  `vmtestmark` + `hello.com`) y primer arranque real en QEMU/KVM.
+  `labeler` están `disabled_manually`. En la primera ejecución de `build.yml`
+  (run `39159359232`) cinco de los siete trabajos ya están en verde (GCC i386,
+  GCC amd64, Clang riscv64 ×2 y Clang ppc); Clang amd64 y Clang arm64 seguían
+  en curso al cerrar la sesión. Queda confirmarlos y anotar el resultado.
+- **Decisión del analista sobre la AC de validación de punteros** (desviación
+  10): la comprobación literal no es alcanzable desde modo real de 16 bits.
+  Opciones: reformular la AC (p. ej., validar el borde `FFFF:FFF0`), moverla a
+  la Fase 3 (DPMI) o dejar `oobread.com` como comprobación de no rechazo en el
+  borde.
+- **Programas de prueba restantes** (`exitcode`, `stdio`, `filetest`,
+  `memtest`, `xmstest`, `emstest`, `mousetest`, `speaker`, `idle`, `keytest`,
+  `textmodes`, `bench16`) y marcas `LIBRENT-VMTEST-KEYS` por QMP: S5.
+- **Código de salida distinto de 0**: el mecanismo está probado con 0; el caso
+  `exitcode.com 7` y ERRORLEVEL llegan con la prueba `exitcode` (S5).
+- **`ENABLE_NTVDM` desactivada**: `ERROR_BAD_EXE_FORMAT` implementado; falta
+  la prueba con una imagen sin `ntvdm.exe` (S4/S5).
 - **Nota O-01**: sigue sin confirmar por el desarrollador; si cambia, afecta a
   pruebas y plan, no a lo ya implementado.
 - **Estado de ppc/riscv64**: solo se verificó la configuración (sin NTVDM);
@@ -209,7 +379,26 @@ ninja -C output-Clang-arm64-debug ntvdm command pifmgr vdmdbg
 qemu-system-x86_64 -enable-kvm -m 2048 -drive file=output-Clang-amd64-debug/LiberNT.img,format=raw
 ```
 
-- Pruebas automáticas: aún no disponibles; llegan con el arnés de S2
-  (`scripts/librent/vmtest.py payload|run|report|all`).
+- Arnés de pruebas (S2). La imagen debe estar construida con el arnés activado:
+
+```sh
+./configure.sh -a amd64 -DENABLE_NTVDM_BOOT_RUN=ON
+ninja -C output-Clang-amd64-debug liberntimg
+python3 scripts/librent/vmtest.py all \
+    --image output-Clang-amd64-debug/LiberNT.img \
+    --build-dir output-Clang-amd64-debug
+```
+
+Resultado esperado y comprobado: `own-hello ok`, `own-oobread ok`,
+`2/2 items ok`. El trabajo del arnés vive en `output-Clang-amd64-debug/vmtest/`
+(`payload.img`, `results/`, `serial.log`, `qmp.sock`), se reutiliza y se
+sobrescribe en cada ejecución.
+
+Órdenes por separado: `payload` (crea el disco de pruebas FAT32 con `mtools`),
+`run` (arranca QEMU/KVM sin pantalla con instantánea del disco del sistema y
+el disco de pruebas como segunda unidad IDE), `report` (extrae `RESULTS\` y
+compara con `scripts/librent/corpus/golden/`) y `all` (las tres).
+
 - Migración a otra máquina: clonar el repo, instalar RosBE con el bootstrap,
-  `mtools` y Python con `mako/packaging/pyyaml`, y ejecutar las mismas órdenes.
+  `mtools` y Python con `mako/packaging/pyyaml` (solo para configurar Mesa), y
+  ejecutar las mismas órdenes.

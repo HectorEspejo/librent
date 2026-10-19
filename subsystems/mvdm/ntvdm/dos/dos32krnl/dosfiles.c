@@ -782,6 +782,9 @@ WORD DosReadFile(WORD FileHandle,
         return ERROR_INVALID_HANDLE;
     }
 
+    if (!MemIsValidAddress(TO_LINEAR(HIWORD(Buffer), LOWORD(Buffer)), Count))
+        return ERROR_INVALID_ADDRESS;
+
     if (Descriptor->DeviceInfo & FILE_INFO_DEVICE)
     {
         PDOS_DEVICE_NODE Node = DosGetDriverNode(Descriptor->DevicePointer);
@@ -928,6 +931,9 @@ WORD DosWriteFile(WORD FileHandle,
         /* Invalid handle */
         return ERROR_INVALID_HANDLE;
     }
+
+    if (!MemIsValidAddress(TO_LINEAR(HIWORD(Buffer), LOWORD(Buffer)), Count))
+        return ERROR_INVALID_ADDRESS;
 
     if (Descriptor->DeviceInfo & FILE_INFO_DEVICE)
     {

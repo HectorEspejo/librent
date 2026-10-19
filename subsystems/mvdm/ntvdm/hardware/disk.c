@@ -375,6 +375,9 @@ ReadDisk(IN PDISK_IMAGE DiskImage,
 
     BytesToRead = (DWORD)NumSectors * DiskImage->DiskInfo.SectorSize;
 
+    if (!MemIsValidAddress(TO_LINEAR(getES(), getBX()), BytesToRead))
+        return 0x09;
+
     // FIXME: Consider just looping around filling each time the buffer...
 
     if (BytesToRead <= sizeof(StaticBuffer))
@@ -435,6 +438,9 @@ WriteDisk(IN PDISK_IMAGE DiskImage,
         return Result;
 
     BytesToWrite = (DWORD)NumSectors * DiskImage->DiskInfo.SectorSize;
+
+    if (!MemIsValidAddress(TO_LINEAR(getES(), getBX()), BytesToWrite))
+        return 0x09;
 
     // FIXME: Consider just looping around filling each time the buffer...
 

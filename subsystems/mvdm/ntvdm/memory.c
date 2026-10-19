@@ -417,7 +417,12 @@ MGetVdmPointer(IN ULONG   Address,
                IN ULONG   Size,
                IN BOOLEAN ProtectedMode)
 {
-    UNREFERENCED_PARAMETER(Size);
+    if (!ProtectedMode && !MemIsValidAddress(TO_LINEAR(HIWORD(Address), LOWORD(Address)), Size))
+    {
+        SetLastError(ERROR_INVALID_ADDRESS);
+        return NULL;
+    }
+
     return Sim32pGetVDMPointer(Address, ProtectedMode);
 }
 
@@ -723,52 +728,50 @@ BOOLEAN
 MemInitialize(VOID)
 {
     NTSTATUS Status;
-    SIZE_T MemorySize = MAX_ADDRESS; // See: kernel32/client/vdm.c!BaseGetVdmConfigInfo
+    PVOID CommitAddress;
+    SIZE_T ReserveSize = MAX_ADDRESS + MEM_GUARD_SIZE; // See: kernel32/client/vdm.c!BaseGetVdmConfigInfo
+    SIZE_T CommitSize = MAX_ADDRESS;
 
     InitializeListHead(&HookList);
 
-#ifndef STANDALONE
-
-    /*
-     * The reserved region starts from the very first page.
-     * We need to commit the reserved first 16 MB virtual address.
-     *
-     * NOTE: NULL has another signification for NtAllocateVirtualMemory.
-     */
-    BaseAddress = (PVOID)1;
-
-    /*
-     * Since to get NULL, we allocated from 0x1, account for this.
-     * See also: kernel32/client/proc.c!CreateProcessInternalW
-     */
-    MemorySize -= 1;
-
-#else
-
-    /* Allocate it anywhere */
     BaseAddress = NULL;
-
-#endif
-
     Status = NtAllocateVirtualMemory(NtCurrentProcess(),
                                      &BaseAddress,
                                      0,
-                                     &MemorySize,
-#ifndef STANDALONE
+                                     &ReserveSize,
+                                     MEM_RESERVE,
+                                     PAGE_NOACCESS);
+    if (!NT_SUCCESS(Status))
+    {
+        wprintf(L"FATAL: Failed to reserve VDM memory, Status 0x%08lx\n", Status);
+        return FALSE;
+    }
+
+    if (BaseAddress == NULL)
+    {
+        wprintf(L"FATAL: The VDM memory was mapped at address 0\n");
+        ReserveSize = MAX_ADDRESS + MEM_GUARD_SIZE;
+        NtFreeVirtualMemory(NtCurrentProcess(), &BaseAddress, &ReserveSize, MEM_RELEASE);
+        return FALSE;
+    }
+
+    CommitAddress = BaseAddress;
+    Status = NtAllocateVirtualMemory(NtCurrentProcess(),
+                                     &CommitAddress,
+                                     0,
+                                     &CommitSize,
                                      MEM_COMMIT,
-#else
-                                     MEM_RESERVE | MEM_COMMIT,
-#endif
                                      PAGE_EXECUTE_READWRITE);
     if (!NT_SUCCESS(Status))
     {
         wprintf(L"FATAL: Failed to commit VDM memory, Status 0x%08lx\n", Status);
+        ReserveSize = MAX_ADDRESS + MEM_GUARD_SIZE;
+        NtFreeVirtualMemory(NtCurrentProcess(), &BaseAddress, &ReserveSize, MEM_RELEASE);
         return FALSE;
     }
 
-#ifndef STANDALONE
-    ASSERT(BaseAddress == NULL);
-#endif
+    DPRINT1("NTVDM: Guest memory at %p, guard at %p\n",
+            BaseAddress, (PVOID)((ULONG_PTR)BaseAddress + MAX_ADDRESS));
 
     /*
      * For diagnostics purposes, we fill the memory with INT 0x03 codes
@@ -783,7 +786,7 @@ VOID
 MemCleanup(VOID)
 {
     NTSTATUS Status;
-    SIZE_T MemorySize = MAX_ADDRESS;
+    SIZE_T MemorySize = MAX_ADDRESS + MEM_GUARD_SIZE;
     PLIST_ENTRY Pointer;
 
     while (!IsListEmpty(&HookList))
@@ -792,20 +795,26 @@ MemCleanup(VOID)
         RtlFreeHeap(RtlGetProcessHeap(), 0, CONTAINING_RECORD(Pointer, MEM_HOOK, Entry));
     }
 
-    /* Decommit the VDM memory */
-    Status = NtFreeVirtualMemory(NtCurrentProcess(),
-                                 &BaseAddress,
-                                 &MemorySize,
-#ifndef STANDALONE
-                                 MEM_DECOMMIT
-#else
-                                 MEM_RELEASE
-#endif
-                                 );
-    if (!NT_SUCCESS(Status))
+    /* Release the VDM memory and its guard area */
+    if (BaseAddress != NULL)
     {
-        DPRINT1("NTVDM: Failed to decommit VDM memory, Status 0x%08lx\n", Status);
+        Status = NtFreeVirtualMemory(NtCurrentProcess(),
+                                     &BaseAddress,
+                                     &MemorySize,
+                                     MEM_RELEASE);
+        if (!NT_SUCCESS(Status))
+        {
+            DPRINT1("NTVDM: Failed to release VDM memory, Status 0x%08lx\n", Status);
+        }
     }
+}
+
+BOOLEAN
+MemIsValidAddress(IN ULONG Address, IN ULONG Size)
+{
+    if (Address > MAX_ADDRESS) return FALSE;
+    if (Size > MAX_ADDRESS - Address) return FALSE;
+    return TRUE;
 }
 
 /* EOF */

@@ -133,6 +133,10 @@ def cmd_payload(args):
     runtests.write_text(generate_runtests(items), encoding='ascii', newline='')
     run(['mcopy', '-i', payload, runtests, '::LIBRENT/RUNTESTS.CMD'])
 
+    launcher = Path(args.out).parent / 'launcher.cmd'
+    launcher.write_bytes(b'@echo off\r\n%SystemRoot%\\system32\\librent-vmtest.cmd\r\n')
+    run(['mcopy', '-i', payload, launcher, '::launcher.cmd'])
+
     print('Payload disk {} ready with {} item(s)'.format(payload, len(items)), file=sys.stderr)
     return 0
 

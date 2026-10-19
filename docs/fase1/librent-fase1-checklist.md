@@ -40,40 +40,40 @@
 - [x] Comprobación de `VdmAllowed` (`ProcessWx86Information`) mantenida al arrancar `ntvdm.exe`
 
 ## Ventana de la VDM
-- [ ] Frontend de consola (`console/console.c`, `console/video.c`) eliminado y sustituido por el frontend de ventana en `ntvdm/frontend/`
-- [ ] Hilo de ventana con bucle de mensajes propio, separado del hilo de emulación
-- [ ] Modo texto pintado con la fuente del plano 2 de la VGA emulada
+- [x] Frontend de consola (`console/console.c`, `console/video.c`) eliminado y sustituido por el frontend de ventana en `ntvdm/frontend/`
+- [x] Hilo de ventana con bucle de mensajes propio, separado del hilo de emulación
+- [x] Modo texto pintado con la fuente del plano 2 de la VGA emulada
   - AC: Dado `textmodes.com`, cuando carga una fuente propia con INT 10h AX=1110h, entonces la ventana muestra sus glifos
-- [ ] Ancho de celda de 8 o 9 puntos según la VGA emulada, con la novena columna replicada en los caracteres C0h–DFh
-- [ ] Modos de texto 40×25, 80×25, 80×43 y 80×50
-- [ ] Colores de los 16 atributos según la paleta DAC de la VGA emulada
-- [ ] Parpadeo de atributo o fondo intenso según el registro de modo del controlador de atributos
-- [ ] Cursor de texto con la forma, posición y visibilidad del CRTC
-- [ ] Escalado entero automático (el mayor que cabe, hasta 4×) y fijo 1×, 2×, 3× y 4×
-- [ ] Alt+Intro alterna pantalla completa sin cambiar el modo de vídeo del sistema
-- [ ] Título de la ventana con el nombre del programa DOS
-- [ ] Cerrar la ventana con el programa en marcha pide confirmación y lo termina
+- [x] Ancho de celda de 8 o 9 puntos según la VGA emulada, con la novena columna replicada en los caracteres C0h–DFh
+- [x] Modos de texto 40×25, 80×25, 80×43 y 80×50
+- [x] Colores de los 16 atributos según la paleta DAC de la VGA emulada
+- [x] Parpadeo de atributo o fondo intenso según el registro de modo del controlador de atributos
+- [x] Cursor de texto con la forma, posición y visibilidad del CRTC
+- [x] Escalado entero automático (el mayor que cabe, hasta 4×) y fijo 1×, 2×, 3× y 4×
+- [x] Alt+Intro alterna pantalla completa sin cambiar el modo de vídeo del sistema
+- [x] Título de la ventana con el nombre del programa DOS
+- [x] Cerrar la ventana con el programa en marcha pide confirmación y lo termina
   - AC: Dado EDIT abierto, cuando se cierra la ventana y se confirma, entonces `ntvdm.exe` termina con `STATUS_CONTROL_C_EXIT`
-- [ ] Al terminar el último programa DOS de la VDM, la ventana se cierra y el foco vuelve a la ventana anterior
+- [x] Al terminar el último programa DOS de la VDM, la ventana se cierra y el foco vuelve a la ventana anterior
 - [ ] Lanzada desde el Explorador, no queda visible ninguna ventana de consola vacía
-- [ ] Menú del sistema con Pantalla completa, Escala, Copiar texto, Pegar, Volcar memoria, Terminar la VDM y Acerca de la VDM
-- [ ] «Acerca de la VDM» muestra la versión de librent (`LIBRENT_VERSION`) y la de LiberNT
-- [ ] Escala y pantalla completa al iniciar guardadas en `HKCU\Software\librent\NTVDM`
-- [ ] Superficie gráfica del frontend implementada (su validación es de la Fase 2)
-- [ ] Textos nuevos de la ventana en `en-US` y `es-ES`, con la cadena inglesa en el resto de idiomas
+- [x] Menú del sistema con Pantalla completa, Escala, Copiar texto, Pegar, Volcar memoria, Terminar la VDM y Acerca de la VDM
+- [x] «Acerca de la VDM» muestra la versión de librent (`LIBRENT_VERSION`) y la de LiberNT
+- [x] Escala y pantalla completa al iniciar guardadas en `HKCU\Software\librent\NTVDM`
+- [x] Superficie gráfica del frontend implementada (su validación es de la Fase 2)
+- [x] Textos nuevos de la ventana en `en-US` y `es-ES`, con la cadena inglesa en el resto de idiomas
 
 ## Entrada
-- [ ] Teclas traducidas a códigos de exploración del conjunto 1, con prefijo E0 en las extendidas
-- [ ] Caracteres según la distribución de teclado activa de Windows, convertidos a la página de códigos OEM 437
+- [x] Teclas traducidas a códigos de exploración del conjunto 1, con prefijo E0 en las extendidas
+- [x] Caracteres según la distribución de teclado activa de Windows, convertidos a la página de códigos OEM 437
   - AC: Dado el teclado español, cuando se teclea «ñ» en EDIT y se guarda, entonces el fichero contiene el byte A4h y la ventana muestra «ñ»
-- [ ] Estado de Ctrl, Alt, Mayús, Bloq Mayús y Bloq Num reflejado en el estado de teclado de la BIOS
-- [ ] Alt+Intro no llega al programa DOS
+- [x] Estado de Ctrl, Alt, Mayús, Bloq Mayús y Bloq Num reflejado en el estado de teclado de la BIOS
+- [x] Alt+Intro no llega al programa DOS
 - [ ] Ctrl+C en la consola de cmd mientras corre el programa llega al DOS como Ctrl+Pausa
-- [ ] Ratón INT 33h con coordenadas absolutas y botones izquierdo, derecho y central
+- [x] Ratón INT 33h con coordenadas absolutas y botones izquierdo, derecho y central
   - AC: Dado el modo 80×25, cuando el puntero está sobre la celda columna 10 y fila 5, entonces INT 33h AX=3 devuelve CX=80 y DX=40
-- [ ] Puntero del sistema oculto sobre la ventana mientras el programa muestra su cursor de ratón
-- [ ] Copiar texto: la pantalla entera al portapapeles en Unicode, convertida desde CP437
-- [ ] Pegar: texto del portapapeles convertido a CP437 e inyectado en el búfer de teclado de la BIOS a medida que se vacía
+- [x] Puntero del sistema oculto sobre la ventana mientras el programa muestra su cursor de ratón
+- [x] Copiar texto: la pantalla entera al portapapeles en Unicode, convertida desde CP437
+- [x] Pegar: texto del portapapeles convertido a CP437 e inyectado en el búfer de teclado de la BIOS a medida que se vacía
 
 ## Integración con el sistema
 - [x] Un `.COM` o `.EXE` de DOS lanzado desde cmd se ejecuta en una VDM y cmd espera a que termine
@@ -131,15 +131,15 @@
 - [ ] Pruebas manuales hechas y anotadas: teclado español, ratón real en EDIT, pantalla completa, copiar y pegar, doble clic en el Explorador y memoria del proceso por debajo de 64 MB
 
 ## Interfaces
-- [ ] `VgaConsoleInitialize` y `VgaConsoleCleanup` crean y cierran la ventana y su hilo
-- [ ] `VgaConsoleCreateTextScreen` y `VgaConsoleDestroyTextScreen` sobre la rejilla de `CHAR_CELL`
-- [ ] `VgaConsoleCreateGraphicsScreen` y `VgaConsoleDestroyGraphicsScreen` sobre un DIB indexado con paleta
-- [ ] `VgaConsoleRepaintScreen` invalida el rectángulo y pinta el hilo de ventana
-- [ ] `VgaConsoleUpdateTextCursor` actualiza forma, posición y visibilidad del cursor
-- [ ] `VgaAttachToConsole` y `VgaDetachFromConsole` muestran y ocultan la consola para los programas Win32 lanzados desde DOS
-- [ ] `VgaGetDoubleVisionState` sin cambios de comportamiento
-- [ ] `ScreenEventHandler` eliminado
-- [ ] `KeyboardEventHandler`, `MouseEventHandler` y `FocusEventHandler` llamados desde el hilo de ventana
+- [x] `VgaConsoleInitialize` y `VgaConsoleCleanup` crean y cierran la ventana y su hilo
+- [x] `VgaConsoleCreateTextScreen` y `VgaConsoleDestroyTextScreen` sobre la rejilla de `CHAR_CELL`
+- [x] `VgaConsoleCreateGraphicsScreen` y `VgaConsoleDestroyGraphicsScreen` sobre un DIB indexado con paleta
+- [x] `VgaConsoleRepaintScreen` invalida el rectángulo y pinta el hilo de ventana
+- [x] `VgaConsoleUpdateTextCursor` actualiza forma, posición y visibilidad del cursor
+- [x] `VgaAttachToConsole` y `VgaDetachFromConsole` muestran y ocultan la consola para los programas Win32 lanzados desde DOS
+- [x] `VgaGetDoubleVisionState` sin cambios de comportamiento
+- [x] `ScreenEventHandler` eliminado
+- [x] `KeyboardEventHandler`, `MouseEventHandler` y `FocusEventHandler` llamados desde el hilo de ventana
 - [ ] `CreateProcessInternalW`, `BaseCheckVDM` y `BaseCheckForVDM` verificados sin cambios en la ruta VDM
 - [ ] `BaseGetVdmConfigInfo` con reserva 0 y `ERROR_BAD_EXE_FORMAT` si falta `ntvdm.exe`
 - [ ] `GetNextVDMCommand` y `ExitVDM` siguiendo el modelo de VDM efímera
@@ -158,6 +158,6 @@
 
 ---
 
-**Progreso Fase 1:** 33 / 122 funcionalidades
+**Progreso Fase 1:** 68 / 122 funcionalidades
 
-**Total librent (Fases 1-1):** 33 / 122 funcionalidades
+**Total librent (Fases 1-1):** 68 / 122 funcionalidades

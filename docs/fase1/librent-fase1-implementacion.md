@@ -2,7 +2,7 @@
 
 ## Informe de implementación
 
-**Última actualización:** 18/10/2026 (sesión 2: S2)
+**Última actualización:** 19/10/2026 (sesión 3: S3)
 
 ---
 
@@ -108,6 +108,70 @@
 - Comprobación de `VdmAllowed` mantenida en `wmain`; `ntoskrnl/nvs` sin
   cambios.
 
+### S3 · Ventana y entrada
+
+- **Frontend de ventana nuevo** en `ntvdm/frontend/`: se elimina
+  `ntvdm/console/` y el estado de la ventana vive en `VDM_FRONTEND`
+  (`frontend.h`), con hilo de interfaz propio y bucle de mensajes separado del
+  hilo de emulación. `console/video.c` se sustituye por `frontend/video.c`
+  (incluido en `svga.c`, como antes, para acceder a los registros y a la
+  memoria VGA) y la entrada por `frontend/input.c`.
+- **Pintado de texto con la fuente del plano 2**: el renderer copia la rejilla
+  de `CHAR_CELL`, la fuente (256 glifos × 32 filas), la paleta DAC y el estado
+  del cursor en la retraza vertical (hilo de emulación) y el hilo de ventana
+  pinta desde esa instantánea; el acceso está protegido por una sección
+  crítica. Ancho de celda de 8 o 9 puntos según el registro de reloj del
+  secuenciador, con la novena columna replicada en `C0h–DFh` sólo en filas
+  impares cuando los gráficos de línea están activos, como especifica §7.2.
+- **Fuente de usuario (INT 10h AX=1110h)**: `vidbios.c` carga el rango de
+  patrones indicado por ES:BP/CX/DX con la nueva
+  `VgaWriteTextModeFontRange`. Verificado con `textmodes.com`: el carácter se
+  pinta como bloque relleno en la ventana.
+- **Colores, parpadeo y cursor**: atributos según la paleta DAC; el bit 7 es
+  parpadeo o fondo intenso según el registro de modo del controlador de
+  atributos; el cursor usa inicio/fin/posición/visibilidad del CRTC y parpadea
+  con un temporizador de 266 ms.
+- **Escalado y pantalla completa**: escalado entero automático (el mayor que
+  cabe, hasta 4×) o fijo 1×–4×; Alt+Intro y el menú alternan pantalla completa
+  sin cambiar el modo de vídeo del sistema, con la imagen centrada y bandas
+  negras. La posición, la escala y el arranque en pantalla completa se guardan
+  en `HKCU\Software\librent\NTVDM` (`WindowX/WindowY`, `WindowScale`,
+  `StartFullScreen`).
+- **Menú del sistema y «Acerca de»**: Pantalla completa, Escala (Automática y
+  1×–4×), Copiar texto, Pegar, Volcar memoria (texto/binario), Terminar la VDM
+  y Acerca de la VDM…, esta última con `librent 0.1.0` (de
+  `LIBRENT_VERSION`) y `LiberNT 0.4.17 (dev)`. Verificado con capturas de
+  pantalla por QMP.
+- **Cierre**: con el programa en marcha pide confirmación (nombre del programa
+  incluido) y, si se confirma, el proceso sale con `STATUS_CONTROL_C_EXIT`
+  (`0xC000013A`); sin diálogos (`NTVDM_NO_DIALOGS=1`) no pregunta. Verificado
+  con `keytest.com` y Alt+F4 en QEMU.
+- **Entrada**: teclas traducidas a códigos de exploración del conjunto 1 (con
+  `E0` en las extendidas) y caracteres según la distribución activa de Windows
+  convertidos a CP437. La BIOS usa el carácter traducido por el anfitrión
+  (cola paralela en `keyboard.c`) y vuelve a `ToAscii` cuando no lo hay.
+  Verificado de punta a punta: teclas enviadas por QMP → ventana → PS/2 →
+  BIOS → `INT 16h` (`keytest.com`: `SCAN=1E CHAR=61`).
+- **Ratón**: eventos del ratón traducidos a coordenadas DOS y enviados a
+  `INT 33h`; el puntero del sistema se oculta mientras el programa muestra su
+  cursor (enganche en `mouse32.c`).
+- **Portapapeles**: «Copiar texto» vuelca la pantalla completa a Unicode desde
+  CP437 (sin espacios finales y con CRLF) a `CF_UNICODETEXT`; «Pegar» convierte
+  el portapapeles a CP437 y alimenta el búfer de teclado de la BIOS en cada
+  retraza vertical mientras quede hueco.
+- **Consola del sistema**: si la VDM es el único proceso de su consola (doble
+  clic desde el Explorador) se oculta la ventana de consola; `ConsoleAttach` /
+  `ConsoleDetach` la vuelven a ocultar o mostrar para los programas Win32
+  lanzados desde DOS.
+- **Arnés**: `vmtest.py payload` pasa a grabar `\launcher.cmd` en el disco de
+  pruebas, con lo que el mecanismo de arranque de pruebas del árbol
+  (`app_launcher.cmd`) ejecuta `librent-vmtest.cmd` y, además, el asistente de
+  primer arranque (OOBE) se salta solo (`HasAutomationPayload`). Se evita así
+  el doble arranque y el OOBE que robaba el foco. Verificado con `keytest.com`
+  y capturas.
+- Compilado en Clang amd64 Debug, GCC i386, GCC amd64 y Clang arm64; arnés en
+  verde (2/2) tras todos los cambios.
+
 ## Desviaciones respecto a la especificación (qué y por qué)
 
 1. **Documentación en `docs/fase1/` y no en `docs/` raíz.** Decisión del
@@ -173,6 +237,33 @@
     por una llamada única. Este fichero desaparece en S3 con el frontend de
     ventana, así que el cambio es un puente mínimo para poder validar S2.
 
+13. **«Acerca de la VDM» usa un cuadro de mensaje** en lugar del diálogo a
+    medida del mockup; el contenido (versiones de librent y LiberNT, CPU,
+    memoria y licencia) es el especificado. El diálogo de cierre es el cuadro
+    estándar de Sí/No: pide confirmación con el nombre del programa, pero los
+    botones se rotulan «Sí/No» en vez de «Terminar/Cancelar».
+14. **El código de salida del cierre**: el proceso `ntvdm.exe` sale con
+    `STATUS_CONTROL_C_EXIT` (`0xC000013A`), como pide la AC. `cmd`, en cambio,
+    recibe el código que basesrv tiene registrado para la tarea DOS (0), porque
+    `GetExitCodeProcess` de un proceso VDM se resuelve con `BaseCheckForVDM` y
+    el modelo `VDM_DOS_RECORD` de §3.2. Si el analista quiere que ERRORLEVEL
+    sea también `0xC000013A`, hace falta propagar el código a la tarea DOS en
+    `ExitVDM`; queda anotado.
+15. **Modos 80×43 y 80×50**: el frontend es genérico (columnas × filas según
+    CRTC), pero esos modos dependen de que el invitado programe el CRTC y la
+    altura de carácter, como hace MS-DOS `MODE CON`. Verificados 80×25 (modo
+    03h) y la carga de fuente 8×8/8×14/8×16; la cobertura de 43/50 filas
+    queda para las pruebas interactivas.
+16. **`frontend/frontend.c` e `input.c` son unidades de compilación nuevas**
+    (no se incluyen con el truco de `console.c` en `ntvdm.c`); `video.c` sí se
+    incluye en `svga.c` como el fichero anterior. El `VDM_FRONTEND` guarda el
+    estado del spec; los detalles de pintado (instantánea, DIB, rect destino)
+    viven en `video.c`.
+17. **El asistente de primer arranque (OOBE) y el arranque de pruebas** usan el
+    gancho existente `\launcher.cmd` + `app_launcher.cmd`; se descartó la
+    entrada `Run` propia (se llegó a crear y se retiró en la misma sesión)
+    porque provocaba doble ejecución del arnés.
+
 ## Estructura de archivos creada/modificada
 
 **Creados (zona del fork):**
@@ -222,6 +313,38 @@
 | `subsystems/mvdm/ntvdm/hardware/disk.c` | validación del búfer del BIOS de disco |
 | `subsystems/mvdm/ntvdm/dos/dem.c` | `HasConsole`, `TaskId` de sesión, VDM efímera |
 | `subsystems/mvdm/ntvdm/console/console.c` | sin bucles de reintento infinitos de `ShowConsoleCursor` (desviación 12) |
+
+**Creados en S3 (zona del fork):**
+
+| Fichero | Contenido |
+|---|---|
+| `subsystems/mvdm/ntvdm/frontend/frontend.h` | `VDM_FRONTEND` y API del frontend |
+| `subsystems/mvdm/ntvdm/frontend/frontend.c` | Ventana, hilo de interfaz, menú, ajustes, consola, cierre |
+| `subsystems/mvdm/ntvdm/frontend/video.c` | Pintado (texto/gráficos), escala, cursor, instantánea, copiar |
+| `subsystems/mvdm/ntvdm/frontend/input.c` | Teclado CP437, ratón, foco, portapapeles, pegado |
+| `modules/rostests/tests/ntvdm16/keytest.S` | Prueba de teclado por BIOS |
+| `modules/rostests/tests/ntvdm16/textmodes.S` | Fuente de usuario INT 10h 1110h |
+| `docs/usuario/dos.md` | Documentación de usuario de los programas DOS |
+
+**Eliminado:** `subsystems/mvdm/ntvdm/console/` (`console.c`, `video.c`,
+`video.h`) y `librent-vmtest.inf`.
+
+**Modificados en S3 (además de los de S2):**
+
+| Fichero | Cambio |
+|---|---|
+| `subsystems/mvdm/ntvdm/ntvdm.c`, `ntvdm.h` | sin el `#include` de `console/`; `VdmShutdown` exportada; salida con el código del frontend |
+| `subsystems/mvdm/ntvdm/emulator.c`, `emulator.h` | sin hilo de entrada de consola ni `ScreenEventHandler`/`MenuEventHandler`; `EmulatorInitialize()` sin argumentos |
+| `subsystems/mvdm/ntvdm/hardware/video/svga.c`, `svga.h` | incluye `frontend/video.c`; `VgaInitialize()`; bombeo de pegado en la retraza; `VgaWriteTextModeFontRange` |
+| `subsystems/mvdm/ntvdm/bios/vidbios.c` | INT 10h AX=1110h (fuente de usuario) |
+| `subsystems/mvdm/ntvdm/bios/bios32/kbdbios32.c` | carácter traducido por el anfitrión; API de empuje al búfer |
+| `subsystems/mvdm/ntvdm/hardware/keyboard.c` | cola de caracteres del anfitrión; inyección de scancodes |
+| `subsystems/mvdm/ntvdm/dos/dem.c` | título de la ventana al arrancar cada programa |
+| `subsystems/mvdm/ntvdm/dos/mouse32.c` | ocultar/mostrar el puntero del sistema |
+| `subsystems/mvdm/ntvdm/lang/en-US.rc`, `es-ES.rc`, `resource.h` | textos y menú nuevos |
+| `modules/rostests/tests/ntvdm16/CMakeLists.txt` | keytest y textmodes |
+| `scripts/librent/vmtest.py` | `launcher.cmd` en el disco de pruebas |
+| `NOVEDADES.md` | funciones visibles de la ventana |
 
 **Estado del repositorio:** los cambios están en cinco commits (formato de
 upstream, sin firma), subidos a `origin`:
@@ -288,6 +411,33 @@ de la confirmación del desarrollador.
 - **Las marcas del arnés se emiten con `OutputDebugStringA`** y llegan a COM1
   gracias a `/DEBUG /DEBUGPORT=COM1 /BAUDRATE=115200`, horneado en la imagen
   solo cuando `ENABLE_NTVDM_BOOT_RUN` está activa.
+- **Instantánea de pantalla en vez de doble búfer con bloqueo del escritor**:
+  el hilo de emulación copia celdas, fuente, paleta y cursor a una instantánea
+  bajo sección crítica en la retraza vertical y el hilo de ventana pinta desde
+  ella. Evita carreras sin tocar el camino caliente de escritura de la memoria
+  VGA.
+- **Carácter traducido por el anfitrión con respaldo en la BIOS**: la cola de
+  caracteres del anfitrión solo se usa cuando existe (teclas con equivalente en
+  CP437); las teclas sin carácter y los scancodes inyectados siguen el camino
+  clásico `ToAscii`, lo que mantiene compatibilidad con programas que leen
+  scancodes.
+- **Pegado alimentado por la retraza vertical**: el búfer de la BIOS tiene 16
+  posiciones; el bombeo comprueba hueco en cada retraza (~60 Hz), lo que
+  satisface «a medida que se vacía» sin depender de que el programa consulte
+  `INT 16h`.
+- **El pegado inyecta caracteres con scancode 0** a través de la API pública
+  del BIOS de teclado (`BiosKeyboardPushKey`), en lugar de simular pulsaciones
+  completas.
+- **Menú del sistema con `TrackPopupMenu` propio** para Alt+Espacio: el teclado
+  del anfitrión no activa el modo de menú de user32 al no pasar las teclas por
+  `DefWindowProc`, así que el menú se abre explícitamente y las teclas Alt+F4 y
+  Alt+Intro se siguen reenviando.
+- **Alt+Intro y Alt+Espacio se consumen en la ventana** (no llegan al DOS),
+  pero el resto de Alt+tecla sí llega al programa.
+- **Gancho de arranque del arnés**: se usa `\\launcher.cmd` +
+  `app_launcher.cmd` del árbol, que además hace que el asistente de primer
+  arranque se salte solo; `ENABLE_NTVDM_BOOT_RUN` instala `vmtestmark.exe` y
+  `librent-vmtest.cmd` sin entrada `Run` propia.
 
 ## Funcionalidades del checklist completadas
 
@@ -324,6 +474,41 @@ de la confirmación del desarrollador.
 - `vmtest.py run`
 - `vmtest.py report`
 - `vmtest.py all`
+- Frontend de consola (`console/console.c`, `console/video.c`) eliminado y sustituido por el frontend de ventana en `ntvdm/frontend/`
+- Hilo de ventana con bucle de mensajes propio, separado del hilo de emulación
+- Modo texto pintado con la fuente del plano 2 de la VGA emulada
+- Ancho de celda de 8 o 9 puntos según la VGA emulada, con la novena columna replicada en los caracteres C0h–DFh
+- Modos de texto 40×25, 80×25, 80×43 y 80×50
+- Colores de los 16 atributos según la paleta DAC de la VGA emulada
+- Parpadeo de atributo o fondo intenso según el registro de modo del controlador de atributos
+- Cursor de texto con la forma, posición y visibilidad del CRTC
+- Escalado entero automático (el mayor que cabe, hasta 4×) y fijo 1×, 2×, 3× y 4×
+- Alt+Intro alterna pantalla completa sin cambiar el modo de vídeo del sistema
+- Título de la ventana con el nombre del programa DOS
+- Cerrar la ventana con el programa en marcha pide confirmación y lo termina
+- Al terminar el último programa DOS de la VDM, la ventana se cierra y el foco vuelve a la ventana anterior
+- Menú del sistema con Pantalla completa, Escala, Copiar texto, Pegar, Volcar memoria, Terminar la VDM y Acerca de la VDM
+- «Acerca de la VDM» muestra la versión de librent (`LIBRENT_VERSION`) y la de LiberNT
+- Escala y pantalla completa al iniciar guardadas en `HKCU\Software\librent\NTVDM`
+- Superficie gráfica del frontend implementada (su validación es de la Fase 2)
+- Textos nuevos de la ventana en `en-US` y `es-ES`, con la cadena inglesa en el resto de idiomas
+- Teclas traducidas a códigos de exploración del conjunto 1, con prefijo E0 en las extendidas
+- Caracteres según la distribución de teclado activa de Windows, convertidos a la página de códigos OEM 437
+- Estado de Ctrl, Alt, Mayús, Bloq Mayús y Bloq Num reflejado en el estado de teclado de la BIOS
+- Alt+Intro no llega al programa DOS
+- Ratón INT 33h con coordenadas absolutas y botones izquierdo, derecho y central
+- Puntero del sistema oculto sobre la ventana mientras el programa muestra su cursor de ratón
+- Copiar texto: la pantalla entera al portapapeles en Unicode, convertida desde CP437
+- Pegar: texto del portapapeles convertido a CP437 e inyectado en el búfer de teclado de la BIOS a medida que se vacía
+- `VgaConsoleInitialize` y `VgaConsoleCleanup` crean y cierran la ventana y su hilo
+- `VgaConsoleCreateTextScreen` y `VgaConsoleDestroyTextScreen` sobre la rejilla de `CHAR_CELL`
+- `VgaConsoleCreateGraphicsScreen` y `VgaConsoleDestroyGraphicsScreen` sobre un DIB indexado con paleta
+- `VgaConsoleRepaintScreen` invalida el rectángulo y pinta el hilo de ventana
+- `VgaConsoleUpdateTextCursor` actualiza forma, posición y visibilidad del cursor
+- `VgaAttachToConsole` y `VgaDetachFromConsole` muestran y ocultan la consola para los programas Win32 lanzados desde DOS
+- `VgaGetDoubleVisionState` sin cambios de comportamiento
+- `ScreenEventHandler` eliminado
+- `KeyboardEventHandler`, `MouseEventHandler` y `FocusEventHandler` llamados desde el hilo de ventana
 
 ## Pendientes y bloqueos
 
@@ -339,8 +524,17 @@ de la confirmación del desarrollador.
   la Fase 3 (DPMI) o dejar `oobread.com` como comprobación de no rechazo en el
   borde.
 - **Programas de prueba restantes** (`exitcode`, `stdio`, `filetest`,
-  `memtest`, `xmstest`, `emstest`, `mousetest`, `speaker`, `idle`, `keytest`,
-  `textmodes`, `bench16`) y marcas `LIBRENT-VMTEST-KEYS` por QMP: S5.
+  `memtest`, `xmstest`, `emstest`, `mousetest`, `speaker`, `idle`, `bench16`)
+  y marcas `LIBRENT-VMTEST-KEYS` por QMP: S5. `keytest` y `textmodes` ya
+  existen y se usaron para validar S3.
+- **Verificaciones manuales pendientes de S3** (con EDIT y teclado español,
+  ratón real, Explorador y el AC del ratón con `mousetest`): S5. La captura de
+  pantalla por QMP queda como herramienta manual, no en el arnés automático.
+- **Ctrl+C → Ctrl+Pausa**: implementado en el manejador de consola (inyecta la
+  secuencia Ctrl+C en el PS/2); falta comprobarlo con un programa que muestre
+  el efecto (S5).
+- **ERRORLEVEL tras cerrar la ventana**: el proceso sale con `0xC000013A`,
+  pero cmd recibe 0 (código de la tarea DOS); ver desviación 14.
 - **Código de salida distinto de 0**: el mecanismo está probado con 0; el caso
   `exitcode.com 7` y ERRORLEVEL llegan con la prueba `exitcode` (S5).
 - **`ENABLE_NTVDM` desactivada**: `ERROR_BAD_EXE_FORMAT` implementado; falta
@@ -400,6 +594,12 @@ sobrescribe en cada ejecución.
 el disco de pruebas como segunda unidad IDE), `report` (extrae `RESULTS\` y
 compara con `scripts/librent/corpus/golden/`) y `all` (las tres).
 
+- Verificación visual de la ventana (manual, fuera del arnés automático):
+  `keytest.com` y `textmodes.com` se ejecutan desde un disco de pruebas con
+  `launcher.cmd` y se capturan pantallazos por QMP (`screendump`) en los
+  momentos de interés; así se comprobaron el texto con la fuente del plano 2,
+  la fuente de usuario, el título, el menú del sistema, «Acerca de», la
+  confirmación de cierre y la pantalla completa con Alt+Intro.
 - Migración a otra máquina: clonar el repo, instalar RosBE con el bootstrap,
   `mtools` y Python con `mako/packaging/pyyaml` (solo para configurar Mesa), y
   ejecutar las mismas órdenes.

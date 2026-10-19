@@ -177,6 +177,7 @@ static VOID WINAPI DosSystemBop(LPWORD Stack)
 
 #ifndef STANDALONE
 static ULONG SessionId = 0;
+static BOOLEAN HasConsole = FALSE;
 
 /*
  * 16-bit Command Interpreter information for DOS reentry
@@ -394,7 +395,7 @@ Command:
 
 #ifndef STANDALONE
     /* Update console title if we run in a separate console */
-    if (SessionId != 0)
+    if (!HasConsole)
         SetConsoleTitleA(AppName);
 #endif
 
@@ -520,7 +521,7 @@ static VOID CmdSetExitCode(VOID)
      */
     ComSpecInfo = FindComSpecInfoByPsp(Sda->CurrentPsp);
     if ((ComSpecInfo && ComSpecInfo->Terminated) ||
-        (ComSpecInfo == &RootCmd && SessionId != 0))
+        (ComSpecInfo == &RootCmd && !HasConsole))
     {
         RemoveComSpecInfo(ComSpecInfo);
 #endif
@@ -535,7 +536,7 @@ static VOID CmdSetExitCode(VOID)
 
 Retry:
     /* Update the VDM state of the task */
-    // CommandInfo.TaskId = SessionId;
+    CommandInfo.TaskId = SessionId;
     CommandInfo.ExitCode = getDX();
     CommandInfo.VDMState = VDM_FLAG_DONT_WAIT;
     DPRINT1("Calling GetNextVDMCommand 32bit end of VDM task\n");
@@ -561,18 +562,21 @@ Retry:
 
         /* Check whether we need to shell out now in case we were started by a 32-bit app */
         ComSpecInfo = FindComSpecInfoByPsp(Sda->CurrentPsp);
-        if (!ComSpecInfo || !ComSpecInfo->Terminated)
+        if (ComSpecInfo != &RootCmd)
         {
-            DPRINT1("Not our 32-bit app, retrying...\n");
-            goto Retry;
+            if (!ComSpecInfo || !ComSpecInfo->Terminated)
+            {
+                DPRINT1("Not our 32-bit app, retrying...\n");
+                goto Retry;
+            }
+
+            ASSERT(ComSpecInfo->Terminated == TRUE);
+
+            /* Record found, remove it and exit now */
+            RemoveComSpecInfo(ComSpecInfo);
         }
 
-        ASSERT(ComSpecInfo->Terminated == TRUE);
-
-        /* Record found, remove it and exit now */
-        RemoveComSpecInfo(ComSpecInfo);
-
-        DPRINT1("Exit DOS from ExitCode wait!\n");
+        DPRINT1("Exit DOS from ExitCode wait - no tasks left!\n");
         setCF(0);
     }
 #endif
@@ -743,7 +747,7 @@ static VOID WINAPI DosCmdInterpreterBop(LPWORD Stack)
              * but instead will directly try to start the 16-bit process.
              */
             // setAL(SessionId != 0);
-            setAL((SessionId != 0) && !Reentry);
+            setAL(!HasConsole && !Reentry);
             /* Reset 'Reentry' */
             Reentry = FALSE;
 #else
@@ -966,6 +970,7 @@ DWORD DosStartProcess32(IN LPCSTR ExecutablePath,
     RtlZeroMemory(&CommandInfo, sizeof(CommandInfo));
 
 Retry:
+    CommandInfo.TaskId = SessionId;
     CommandInfo.VDMState = VDM_FLAG_NESTED_TASK | VDM_FLAG_DONT_WAIT;
     DPRINT1("Calling GetNextVDMCommand 32bit for possible new VDM task...\n");
     Success = GetNextVDMCommand(&CommandInfo);
@@ -1236,6 +1241,8 @@ static VOID WINAPI DosStart(LPWORD Stack)
             SessionId = wcstoul(NtVdmArgv[i] + 2, NULL, 16);
         }
     }
+
+    HasConsole = (GetConsoleWindow() != NULL);
 
     /* Initialize Win32-VDM environment */
     Env = RtlAllocateHeap(RtlGetProcessHeap(), HEAP_ZERO_MEMORY, EnvSize);

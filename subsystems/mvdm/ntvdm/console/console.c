@@ -297,7 +297,7 @@ static VOID CaptureMousePointer(HANDLE ConOutHandle, BOOLEAN Capture)
         // if (IsClipped) return;
 
         /* Be sure the cursor will be hidden */
-        while (ShowConsoleCursor(ConOutHandle, FALSE) >= 0) ;
+        ShowConsoleCursor(ConOutHandle, FALSE);
 
         GetClientRect(hConsoleWnd, &rcClip);
         MapWindowPoints(hConsoleWnd, HWND_DESKTOP /*NULL*/, (LPPOINT)&rcClip, 2 /* Magic value when the LPPOINT parameter is a RECT */);
@@ -311,7 +311,7 @@ static VOID CaptureMousePointer(HANDLE ConOutHandle, BOOLEAN Capture)
         IsClipped = FALSE;
 
         /* Be sure the cursor will be shown */
-        while (ShowConsoleCursor(ConOutHandle, TRUE) < 0) ;
+        ShowConsoleCursor(ConOutHandle, TRUE);
     }
 }
 

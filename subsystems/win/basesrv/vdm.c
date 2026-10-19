@@ -91,6 +91,41 @@ VOID BaseSrvDestroyConsoleRecord(PVDM_CONSOLE_RECORD ConsoleRecord)
     RtlFreeHeap(BaseSrvHeap, 0, ConsoleRecord);
 }
 
+static NTSTATUS BaseSrvGetConsoleRecordByProcessId(ULONG ProcessId, PVDM_CONSOLE_RECORD *Record)
+{
+    PLIST_ENTRY i;
+    PVDM_CONSOLE_RECORD CurrentRecord = NULL;
+
+    if (ProcessId == 0) return STATUS_INVALID_PARAMETER;
+
+    /* Search for a record that belongs to the given process */
+    for (i = VDMConsoleListHead.Flink; i != &VDMConsoleListHead; i = i->Flink)
+    {
+        CurrentRecord = CONTAINING_RECORD(i, VDM_CONSOLE_RECORD, Entry);
+        if (CurrentRecord->ProcessId == ProcessId) break;
+    }
+
+    /* Check if nothing was found */
+    if (i == &VDMConsoleListHead) CurrentRecord = NULL;
+
+    *Record = CurrentRecord;
+    return CurrentRecord ? STATUS_SUCCESS : STATUS_NOT_FOUND;
+}
+
+
+static NTSTATUS BaseSrvGetConsoleRecordForClient(HANDLE ConsoleHandle, PVDM_CONSOLE_RECORD *Record)
+{
+    NTSTATUS Status = BaseSrvGetConsoleRecord(ConsoleHandle, Record);
+
+    if (!NT_SUCCESS(Status))
+    {
+        Status = BaseSrvGetConsoleRecordByProcessId(
+            (ULONG)(ULONG_PTR)CsrGetClientThread()->ClientId.UniqueProcess, Record);
+    }
+
+    return Status;
+}
+
 NTSTATUS GetConsoleRecordBySessionId(ULONG TaskId, PVDM_CONSOLE_RECORD *Record)
 {
     PLIST_ENTRY i;
@@ -653,7 +688,7 @@ CSR_API(BaseSrvCheckVDM)
     if (CheckVdmRequest->BinaryType != BINARY_TYPE_SEPARATE_WOW)
     {
         /* Get the console record */
-        Status = BaseSrvGetConsoleRecord(CheckVdmRequest->ConsoleHandle,
+        Status = BaseSrvGetConsoleRecordForClient(CheckVdmRequest->ConsoleHandle,
                                          &ConsoleRecord);
         if (!NT_SUCCESS(Status))
         {
@@ -667,16 +702,9 @@ CSR_API(BaseSrvCheckVDM)
 
             /* Initialize the console record */
             ConsoleRecord->ConsoleHandle = CheckVdmRequest->ConsoleHandle;
-            if (ConsoleRecord->ConsoleHandle == NULL)
-            {
-                /* The parent doesn't have a console, get a new session ID */
-                ConsoleRecord->SessionId = GetNextDosSesId();
-            }
-            else
-            {
-                /* No session ID is needed */
-                ConsoleRecord->SessionId = 0;
-            }
+
+            /* Give every VDM its own session ID so that it can identify itself */
+            ConsoleRecord->SessionId = GetNextDosSesId();
 
             /* Remember that the console record was allocated here */
             NewConsoleRecord = TRUE;
@@ -831,7 +859,7 @@ CSR_API(BaseSrvUpdateVDMEntry)
         else
         {
             /* Get the console record using the console handle */
-            Status = BaseSrvGetConsoleRecord(UpdateVdmEntryRequest->ConsoleHandle,
+            Status = BaseSrvGetConsoleRecordForClient(UpdateVdmEntryRequest->ConsoleHandle,
                                              &ConsoleRecord);
         }
 
@@ -875,6 +903,9 @@ CSR_API(BaseSrvUpdateVDMEntry)
 
             case VdmEntryUpdateProcess:
             {
+                PROCESS_BASIC_INFORMATION ProcessInfo;
+                ULONG ReturnLength;
+
                 /* Duplicate the VDM process handle */
                 Status = NtDuplicateObject(CsrGetClientThread()->Process->ProcessHandle,
                                            UpdateVdmEntryRequest->VDMProcessHandle,
@@ -884,6 +915,16 @@ CSR_API(BaseSrvUpdateVDMEntry)
                                            0,
                                            DUPLICATE_SAME_ATTRIBUTES | DUPLICATE_SAME_ACCESS);
                 if (!NT_SUCCESS(Status)) goto Cleanup;
+
+                /* Remember the VDM process ID so that it can identify itself */
+                Status = NtQueryInformationProcess(ConsoleRecord->ProcessHandle,
+                                                   ProcessBasicInformation,
+                                                   &ProcessInfo,
+                                                   sizeof(ProcessInfo),
+                                                   &ReturnLength);
+                if (!NT_SUCCESS(Status)) goto Cleanup;
+
+                ConsoleRecord->ProcessId = (ULONG)(ULONG_PTR)ProcessInfo.UniqueProcessId;
 
                 //
                 // FIXME! Should we always do the following??
@@ -1006,7 +1047,7 @@ CSR_API(BaseSrvGetNextVDMCommand)
         else
         {
             /* Get the console record using the console handle */
-            Status = BaseSrvGetConsoleRecord(GetNextVdmCommandRequest->ConsoleHandle,
+            Status = BaseSrvGetConsoleRecordForClient(GetNextVdmCommandRequest->ConsoleHandle,
                                              &ConsoleRecord);
         }
 
@@ -1131,11 +1172,10 @@ CSR_API(BaseSrvGetNextVDMCommand)
     GetNextVdmCommandRequest->WaitObjectForVDM = NULL;
 
     /*
-     * There is no command yet. Prepare for waiting if we asked so,
-     * and if we were not retrying a request.
+     * There is no command yet. Prepare for waiting only if the caller
+     * did not ask for an immediate answer.
      */
-    if (!(GetNextVdmCommandRequest->VDMState & VDM_FLAG_DONT_WAIT) ||
-        !(GetNextVdmCommandRequest->VDMState & VDM_FLAG_RETRY))
+    if (!(GetNextVdmCommandRequest->VDMState & VDM_FLAG_DONT_WAIT))
     {
         if (ConsoleRecord->ServerEvent)
         {
@@ -1179,7 +1219,7 @@ CSR_API(BaseSrvExitVDM)
     if (ExitVdmRequest->iWowTask == 0)
     {
         /* Get the console record */
-        Status = BaseSrvGetConsoleRecord(ExitVdmRequest->ConsoleHandle, &ConsoleRecord);
+        Status = BaseSrvGetConsoleRecordForClient(ExitVdmRequest->ConsoleHandle, &ConsoleRecord);
         if (!NT_SUCCESS(Status)) goto Cleanup;
 
         if (ConsoleRecord->ServerEvent)
@@ -1256,7 +1296,7 @@ CSR_API(BaseSrvGetVDMExitCode)
     RtlEnterCriticalSection(&DosCriticalSection);
 
     /* Get the console record */
-    Status = BaseSrvGetConsoleRecord(GetVDMExitCodeRequest->ConsoleHandle, &ConsoleRecord);
+    Status = BaseSrvGetConsoleRecordForClient(GetVDMExitCodeRequest->ConsoleHandle, &ConsoleRecord);
     if (!NT_SUCCESS(Status)) goto Cleanup;
 
     /* Search for a DOS record that has the same parent process handle */
@@ -1307,7 +1347,7 @@ CSR_API(BaseSrvSetReenterCount)
     RtlEnterCriticalSection(&DosCriticalSection);
 
     /* Get the console record */
-    Status = BaseSrvGetConsoleRecord(SetReenterCountRequest->ConsoleHandle, &ConsoleRecord);
+    Status = BaseSrvGetConsoleRecordForClient(SetReenterCountRequest->ConsoleHandle, &ConsoleRecord);
     if (!NT_SUCCESS(Status)) goto Cleanup;
 
     if (SetReenterCountRequest->fIncDec == VDM_INC_REENTER_COUNT)
@@ -1352,7 +1392,7 @@ CSR_API(BaseSrvSetVDMCurDirs)
     RtlEnterCriticalSection(&DosCriticalSection);
 
     /* Find the console record */
-    Status = BaseSrvGetConsoleRecord(VDMCurrentDirsRequest->ConsoleHandle, &ConsoleRecord);
+    Status = BaseSrvGetConsoleRecordForClient(VDMCurrentDirsRequest->ConsoleHandle, &ConsoleRecord);
     if (!NT_SUCCESS(Status)) goto Cleanup;
 
     if (ConsoleRecord->CurrentDirs == NULL)
@@ -1413,7 +1453,7 @@ CSR_API(BaseSrvGetVDMCurDirs)
     RtlEnterCriticalSection(&DosCriticalSection);
 
     /* Find the console record */
-    Status = BaseSrvGetConsoleRecord(VDMCurrentDirsRequest->ConsoleHandle, &ConsoleRecord);
+    Status = BaseSrvGetConsoleRecordForClient(VDMCurrentDirsRequest->ConsoleHandle, &ConsoleRecord);
     if (!NT_SUCCESS(Status)) goto Cleanup;
 
     /* Return the actual size of the current directory information */

@@ -279,6 +279,15 @@ option(ENABLE_RT2800USB "Whether to build the Ralink RT2870/RT2770 USB Wi-Fi dri
 
 option(ENABLE_RTW8852BS "Whether to build the Realtek RTL8852BS SDIO Wi-Fi driver." OFF)
 
+set(_ntvdm_default OFF)
+if(ARCH STREQUAL "i386" OR ARCH STREQUAL "amd64" OR ARCH STREQUAL "arm64")
+    set(_ntvdm_default ON)
+endif()
+cmake_dependent_option(ENABLE_NTVDM
+                       "Whether to build NTVDM, the virtual DOS machine for DOS and 16-bit applications." ${_ntvdm_default}
+                       "ARCH STREQUAL i386 OR ARCH STREQUAL amd64 OR ARCH STREQUAL arm64" OFF)
+unset(_ntvdm_default)
+
 set(RDPSERVER_DIR "" CACHE PATH
     "MinGW build of the RDP console server (install directory) to stage into the live and preinstalled images")
 set(RDPSERVER_CONFIG_DIR "" CACHE PATH
@@ -302,6 +311,10 @@ cmake_dependent_option(ENABLE_CPUBENCH_BOOT_RUN
 
 cmake_dependent_option(ENABLE_KMTEST_BOOT_RUN
                        "Whether to run unattended KMTests automatically at boot." OFF
+                       "CMAKE_BUILD_TYPE STREQUAL Debug" OFF)
+
+cmake_dependent_option(ENABLE_NTVDM_BOOT_RUN
+                       "Whether to run the NTVDM test harness automatically at boot." OFF
                        "CMAKE_BUILD_TYPE STREQUAL Debug" OFF)
 
 cmake_dependent_option(ENABLE_RP1GEM_BENCHMARK

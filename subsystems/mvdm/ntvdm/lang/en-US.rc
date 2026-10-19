@@ -1,0 +1,42 @@
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+
+STRINGTABLE
+BEGIN
+    IDS_CAPTURE_MOUSE, "&Capture Mouse Pointer"
+    IDS_RELEASE_MOUSE, "&Release Mouse Pointer"
+    IDS_VDM_MENU     , "LiberNT &VDM"
+END
+
+STRINGTABLE
+BEGIN
+    IDS_VDM_DUMPMEM_TXT ,   "Dump Memory (&Text)"
+    IDS_VDM_DUMPMEM_BIN ,   "Dump Memory (&Binary)"
+    IDS_VDM_MOUNT_FLOPPY,   "Insert a floppy in drive %d <%s>..."
+    IDS_VDM_EJECT_FLOPPY,   "Eject floppy from drive %d"
+    IDS_VDM_QUIT        ,   "&Quit the LiberNT VDM"
+END
+
+STRINGTABLE
+BEGIN
+    IDS_VDM_FULLSCREEN      , "&Full Screen"
+    IDS_VDM_SCALE           , "&Scale"
+    IDS_VDM_SCALE_AUTO      , "Automatic"
+    IDS_VDM_SCALE_FORMAT    , "%dx"
+    IDS_VDM_COPY_TEXT       , "&Copy Text"
+    IDS_VDM_PASTE           , "&Paste"
+    IDS_VDM_MEMORY_DUMP     , "Dump &Memory"
+    IDS_VDM_TERMINATE       , "&Terminate the VDM"
+    IDS_VDM_ABOUT           , "&About the VDM..."
+    IDS_VDM_TITLE           , "librent VDM"
+    IDS_VDM_TITLE_FORMAT    , "%s - librent VDM"
+    IDS_VDM_ABOUT_TITLE     , "About the VDM"
+    IDS_VDM_ABOUT_TEXT      , "librent VDM\nlibrent %s\nLiberNT %d.%d.%d (dev)\nCPU: Fast486 (486)\nMemory: 16 MB - XMS - EMS\n\nLicense GPL-3.0-or-later; code inherited from ReactOS GPL-2.0-or-later."
+    IDS_VDM_CLOSE_TITLE     , "librent VDM"
+    IDS_VDM_CLOSE_TEXT      , "%s is still running.\nIf you close the window, unsaved changes will be lost."
+    IDS_VDM_CLOSE_TEXT_DEFAULT, "The DOS program is still running.\nIf you close the window, unsaved changes will be lost."
+END
+
+STRINGTABLE
+BEGIN
+    IDS_NO_MEDIA,   "No media"
+END

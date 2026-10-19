@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "items": [
+    {
+      "id": "own-hello",
+      "name": "hello.com (DOS stdout and exit code)",
+      "source": "repo",
+      "license": "GPL-3.0-or-later",
+      "files": [
+        "hello.com"
+      ],
+      "command": "hello.com > \"%RESULTS%\\own-hello.out\"",
+      "category": "texto",
+      "expect": {
+        "exit_code": 0,
+        "stdout_golden": "own-hello.out"
+      }
+    },
+    {
+      "id": "own-oobread",
+      "name": "oobread.com (INT 21h buffer crossing the end of the guest memory)",
+      "source": "repo",
+      "license": "GPL-3.0-or-later",
+      "files": [
+        "oobread.com"
+      ],
+      "command": "oobread.com > \"%RESULTS%\\own-oobread.out\"",
+      "category": "texto",
+      "expect": {
+        "exit_code": 0,
+        "stdout_golden": "own-oobread.out"
+      }
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+librent-vmtest.cmd -text
+corpus/golden/* -text

@@ -1,0 +1,44 @@
+/* Spanish translation by Ismael Ferreras Morezuelas (Swyter) rev. Julen Urizar Compains (julenuri)*/
+
+LANGUAGE LANG_SPANISH, SUBLANG_NEUTRAL
+
+STRINGTABLE
+BEGIN
+    IDS_CAPTURE_MOUSE, "&Capturar el cursor del ratón"
+    IDS_RELEASE_MOUSE, "&Liberar el cursor del ratón"
+    IDS_VDM_MENU     , "VDM de &LiberNT"
+END
+
+STRINGTABLE
+BEGIN
+    IDS_VDM_DUMPMEM_TXT ,   "Volcar memoria (&texto)"
+    IDS_VDM_DUMPMEM_BIN ,   "Volcar memoria (&binario)"
+    IDS_VDM_MOUNT_FLOPPY,   "Insertar disquete en la unidad %d <%s>..."
+    IDS_VDM_EJECT_FLOPPY,   "Expulsar disquete de la unidad %d"
+    IDS_VDM_QUIT        ,   "&Salir de LiberNT VDM"
+END
+
+STRINGTABLE
+BEGIN
+    IDS_VDM_FULLSCREEN      , "Pantalla &completa"
+    IDS_VDM_SCALE           , "&Escala"
+    IDS_VDM_SCALE_AUTO      , "Automática"
+    IDS_VDM_SCALE_FORMAT    , "%dx"
+    IDS_VDM_COPY_TEXT       , "&Copiar texto"
+    IDS_VDM_PASTE           , "&Pegar"
+    IDS_VDM_MEMORY_DUMP     , "&Volcar memoria"
+    IDS_VDM_TERMINATE       , "&Terminar la VDM"
+    IDS_VDM_ABOUT           , "&Acerca de la VDM..."
+    IDS_VDM_TITLE           , "VDM de librent"
+    IDS_VDM_TITLE_FORMAT    , "%s - VDM de librent"
+    IDS_VDM_ABOUT_TITLE     , "Acerca de la VDM"
+    IDS_VDM_ABOUT_TEXT      , "VDM de librent\nlibrent %s\nLiberNT %d.%d.%d (dev)\nCPU emulada: Fast486 (486)\nMemoria: 16 MB - XMS - EMS\n\nLicencia GPL-3.0-or-later; código heredado de ReactOS GPL-2.0-or-later."
+    IDS_VDM_CLOSE_TITLE     , "VDM de librent"
+    IDS_VDM_CLOSE_TEXT      , "%s sigue en marcha.\nSi cierras la ventana, se perderán los cambios que no haya guardado."
+    IDS_VDM_CLOSE_TEXT_DEFAULT, "El programa de DOS sigue en marcha.\nSi cierras la ventana, se perderán los cambios que no haya guardado."
+END
+
+STRINGTABLE
+BEGIN
+    IDS_NO_MEDIA,   "Sin disco"
+END

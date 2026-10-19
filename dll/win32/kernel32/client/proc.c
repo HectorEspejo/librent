@@ -4247,7 +4247,7 @@ StartScan:
                 }
 
                 /* Since to get NULL, we allocate from 0x1, account for this */
-                VdmReserve--;
+                if (VdmReserve) VdmReserve--;
 
                 /* This implies VDM is ready, so skip everything else */
                 if (VdmWaitObject) goto VdmShortCircuit;
@@ -4370,13 +4370,10 @@ StartScan:
                 }
 
                 /* Since to get NULL, we allocate from 0x1, account for this */
-                VdmReserve--;
+                if (VdmReserve) VdmReserve--;
 
                 /* This implies VDM is ready, so skip everything else */
                 if (VdmWaitObject) goto VdmShortCircuit;
-
-                /* Don't inherit handles since we're doing VDM now */
-                bInheritHandles = FALSE;
 
                 /* Had the user passed in environment? If so, destroy it */
                 if ((lpEnvironment) &&

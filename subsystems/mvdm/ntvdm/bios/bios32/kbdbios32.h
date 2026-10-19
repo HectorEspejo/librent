@@ -37,5 +37,7 @@
 /* FUNCTIONS ******************************************************************/
 
 VOID KbdBios32Post(VOID);
+BOOLEAN BiosKeyboardPushKey(WORD Key);
+BOOLEAN BiosKeyboardBufferHasRoom(VOID);
 
 #endif /* _KBDBIOS32_H_ */

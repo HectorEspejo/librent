@@ -21,6 +21,7 @@
 #include "cpu/cpu.h" // for EMULATOR_FLAG_ZF
 #include "io.h"
 #include "hardware/ps2.h"
+#include "hardware/keyboard.h"
 
 /* PRIVATE VARIABLES **********************************************************/
 
@@ -79,6 +80,19 @@ static BOOLEAN BiosKbdBufferPop(VOID)
 
     /* Return success */
     return TRUE;
+}
+
+BOOLEAN BiosKeyboardPushKey(WORD Key)
+{
+    return BiosKbdBufferPush(Key);
+}
+
+BOOLEAN BiosKeyboardBufferHasRoom(VOID)
+{
+    WORD NextElement = Bda->KeybdBufferTail + sizeof(WORD);
+
+    if (NextElement >= Bda->KeybdBufferEnd) NextElement = Bda->KeybdBufferStart;
+    return (NextElement != Bda->KeybdBufferHead);
 }
 
 /* static */
@@ -291,10 +305,17 @@ VOID WINAPI BiosKeyboardIrq(LPWORD Stack)
 
             default:
             {
+                BYTE HostCharacter;
+
                 Character = Extended ? 0xE0 : 0x00;
 
+                if (!Extended && KeyboardGetHostCharacter(ScanCode, &HostCharacter))
+                {
+                    /* Use the character translated by the host keyboard layout */
+                    Character = HostCharacter;
+                }
                 /* If this is not an extended scancode, and ALT isn't held down, find out which character this is */
-                if (!Extended && !(Bda->KeybdShiftFlags & (BDA_KBDFLAG_ALT | BDA_KBDFLAG_LALT | BDA_KBDFLAG_RALT)))
+                else if (!Extended && !(Bda->KeybdShiftFlags & (BDA_KBDFLAG_ALT | BDA_KBDFLAG_LALT | BDA_KBDFLAG_RALT)))
                 {
                     if (ToAscii(VirtualKey, ScanCode, BiosKeyboardMap, &Character, 0) == 0)
                     {

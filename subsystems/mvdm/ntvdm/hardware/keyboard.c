@@ -24,6 +24,68 @@ static BYTE KbdDataByteWait = 0;
 
 static BYTE KbdPS2Port = 0;
 
+#define HOST_CHAR_QUEUE_SIZE 128
+
+typedef struct _HOST_CHAR_ENTRY
+{
+    BYTE ScanCode;
+    BYTE Character;
+} HOST_CHAR_ENTRY, *PHOST_CHAR_ENTRY;
+
+static HOST_CHAR_ENTRY HostCharQueue[HOST_CHAR_QUEUE_SIZE];
+static ULONG HostCharHead = 0;
+static ULONG HostCharTail = 0;
+static CRITICAL_SECTION HostCharLock;
+
+static VOID
+KeyboardPushHostCharacter(BYTE ScanCode, BYTE Character)
+{
+    ULONG Next;
+
+    EnterCriticalSection(&HostCharLock);
+
+    Next = (HostCharTail + 1) % HOST_CHAR_QUEUE_SIZE;
+    if (Next != HostCharHead)
+    {
+        HostCharQueue[HostCharTail].ScanCode = ScanCode & 0x7F;
+        HostCharQueue[HostCharTail].Character = Character;
+        HostCharTail = Next;
+    }
+
+    LeaveCriticalSection(&HostCharLock);
+}
+
+BOOLEAN
+KeyboardGetHostCharacter(BYTE ScanCode, PBYTE Character)
+{
+    ULONG Index, i;
+    BOOLEAN Found = FALSE;
+
+    EnterCriticalSection(&HostCharLock);
+
+    for (Index = HostCharHead; Index != HostCharTail; Index = (Index + 1) % HOST_CHAR_QUEUE_SIZE)
+    {
+        if (HostCharQueue[Index].ScanCode == (ScanCode & 0x7F))
+        {
+            *Character = HostCharQueue[Index].Character;
+
+            for (i = Index; i != HostCharTail; i = (i + 1) % HOST_CHAR_QUEUE_SIZE)
+            {
+                ULONG Next = (i + 1) % HOST_CHAR_QUEUE_SIZE;
+                if (Next == HostCharTail) break;
+                HostCharQueue[i] = HostCharQueue[Next];
+            }
+
+            HostCharTail = (HostCharTail + HOST_CHAR_QUEUE_SIZE - 1) % HOST_CHAR_QUEUE_SIZE;
+            Found = TRUE;
+            break;
+        }
+    }
+
+    LeaveCriticalSection(&HostCharLock);
+    return Found;
+}
+
 /* PRIVATE FUNCTIONS **********************************************************/
 
 static VOID WINAPI KeyboardCommand(LPVOID Param, BYTE Command)
@@ -180,13 +242,24 @@ VOID KeyboardEventHandler(PKEY_EVENT_RECORD KeyEvent)
     {
         if (KeyEvent->dwControlKeyState & ENHANCED_KEY) PS2QueuePush(KbdPS2Port, 0xE0);
         PS2QueuePush(KbdPS2Port, ScanCode);
+
+        if (KeyEvent->bKeyDown && KeyEvent->uChar.AsciiChar != 0)
+            KeyboardPushHostCharacter(ScanCode, KeyEvent->uChar.AsciiChar);
     }
 
     DPRINT("Press 0x%X\n", ScanCode);
 }
 
+VOID KeyboardInjectScanCode(BYTE ScanCode)
+{
+    PS2QueuePush(KbdPS2Port, ScanCode);
+}
+
 BOOLEAN KeyboardInit(BYTE PS2Connector)
 {
+    InitializeCriticalSection(&HostCharLock);
+    HostCharHead = HostCharTail = 0;
+
     /* Finish to plug the keyboard to the specified PS/2 port */
     KbdPS2Port = PS2Connector;
     PS2SetDeviceCmdProc(KbdPS2Port, NULL, KeyboardCommand);

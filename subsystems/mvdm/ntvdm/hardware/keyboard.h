@@ -20,6 +20,8 @@
 /* FUNCTIONS ******************************************************************/
 
 VOID KeyboardEventHandler(PKEY_EVENT_RECORD KeyEvent);
+VOID KeyboardInjectScanCode(BYTE ScanCode);
+BOOLEAN KeyboardGetHostCharacter(BYTE ScanCode, PBYTE Character);
 BOOLEAN KeyboardInit(BYTE PS2Connector);
 
 #endif /* _KEYBOARD_H_ */

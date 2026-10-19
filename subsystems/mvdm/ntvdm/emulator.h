@@ -133,7 +133,7 @@ VOID EmulatorPause(VOID);
 VOID EmulatorResume(VOID);
 VOID EmulatorTerminate(VOID);
 
-BOOLEAN EmulatorInitialize(HANDLE ConsoleInput, HANDLE ConsoleOutput);
+BOOLEAN EmulatorInitialize(VOID);
 VOID EmulatorCleanup(VOID);
 
 #endif // _EMULATOR_H_

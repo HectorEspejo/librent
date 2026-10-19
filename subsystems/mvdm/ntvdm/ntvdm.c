@@ -9,6 +9,7 @@
 /* INCLUDES *******************************************************************/
 
 #include "ntvdm.h"
+#include "frontend/frontend.h"
 
 #define NDEBUG
 #include <debug.h>
@@ -306,12 +307,6 @@ FreeGlobalSettings(IN PNTVDM_SETTINGS Settings)
     }
 }
 
-static VOID
-ConsoleCleanup(VOID);
-
-/** HACK!! **/
-#include "./console/console.c"
-/** HACK!! **/
 
 /*static*/ VOID
 VdmShutdown(BOOLEAN Immediate)
@@ -350,7 +345,7 @@ VdmShutdown(BOOLEAN Immediate)
 
         DPRINT1("\n\n\nNTVDM - Exiting...\n\n\n");
         /* Some VDDs rely on the fact that NTVDM calls ExitProcess on Windows */
-        ExitProcess(0);
+        ExitProcess(VgaFrontendGetExitCode());
     }
 }
 
@@ -399,7 +394,7 @@ DisplayMessage(IN LPCWSTR Format, ...)
 
     /* Display the message */
     DPRINT1("\n\nNTVDM Subsystem\n%S\n\n", Buffer);
-    MessageBoxW(hConsoleWnd, Buffer, L"NTVDM Subsystem", MB_OK);
+    MessageBoxW(VgaConsoleGetWindow(), Buffer, L"NTVDM Subsystem", MB_OK);
 
 #ifndef WIN2K_COMPLIANT
     /* Free the buffer if needed */
@@ -590,7 +585,7 @@ wmain(INT argc, WCHAR *argv[])
     }
 
     /* Initialize the emulator */
-    if (!EmulatorInitialize(ConsoleInput, ConsoleOutput))
+    if (!EmulatorInitialize())
     {
         wprintf(L"FATAL: Failed to initialize the emulator.\n");
         goto Cleanup;

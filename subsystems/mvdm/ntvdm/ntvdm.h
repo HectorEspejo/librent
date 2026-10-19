@@ -98,8 +98,6 @@ extern WCHAR** NtVdmArgv;
 extern WCHAR NtVdmPath[MAX_PATH];
 extern ULONG NtVdmPathSize; // Length without NULL terminator.
 
-extern HWND hConsoleWnd;
-
 
 /* FUNCTIONS ******************************************************************/
 
@@ -114,12 +112,13 @@ VOID PrintMessageAnsi(IN CHAR_PRINT CharPrint,
 /*static*/ VOID
 UpdateVdmMenuDisks(VOID);
 
+BOOL ConsoleInit(VOID);
+VOID ConsoleCleanup(VOID);
 BOOL ConsoleAttach(VOID);
 VOID ConsoleDetach(VOID);
-VOID ConsoleReattach(HANDLE ConOutHandle);
 BOOL IsConsoleHandle(HANDLE hHandle);
-VOID MenuEventHandler(PMENU_EVENT_RECORD MenuEvent);
-VOID FocusEventHandler(PFOCUS_EVENT_RECORD FocusEvent);
+
+VOID VdmShutdown(BOOLEAN Immediate);
 
 #endif // _NTVDM_H_
 

@@ -21,7 +21,7 @@
 #include "io.h"
 #include "clock.h"
 
-#include "../../console/video.h"
+#include "../../frontend/frontend.h"
 
 /* PRIVATE VARIABLES **********************************************************/
 
@@ -301,7 +301,7 @@ static SMALL_RECT UpdateRectangle = { 0, 0, 0, 0 };
 
 
 /** HACK!! **/
-#include "../../console/video.c"
+#include "../../frontend/video.c"
 /** HACK!! **/
 
 
@@ -1616,6 +1616,9 @@ static inline VOID VgaVerticalRetrace(VOID)
     // if (!ModeChanged && !CursorChanged && !PaletteChanged && !NeedsUpdate)
         // return;
 
+    /* Feed any pending pasted characters into the guest keyboard buffer */
+    VgaFrontendPumpPaste();
+
     /* Change the display mode */
     if (ModeChanged) VgaChangeMode();
 
@@ -2076,30 +2079,37 @@ VOID VgaClearMemory(VOID)
     RtlZeroMemory(VgaMemory, sizeof(VgaMemory));
 }
 
-VOID VgaWriteTextModeFont(UINT FontNumber, CONST UCHAR* FontData, UINT Height)
+VOID VgaWriteTextModeFontRange(UINT First, UINT Count, UINT Height, CONST UCHAR* FontData)
 {
     UINT i, j;
     ASSERT(Height <= VGA_MAX_FONT_HEIGHT);
+    ASSERT(First + Count <= VGA_FONT_CHARACTERS);
 
-    for (i = 0; i < VGA_FONT_CHARACTERS; i++)
+    for (i = 0; i < Count; i++)
     {
         /* Write the character */
         for (j = 0; j < Height; j++)
         {
-            VgaMemory[(i * VGA_MAX_FONT_HEIGHT + j) * VGA_NUM_BANKS + VGA_FONT_BANK] = FontData[i * Height + j];
+            VgaMemory[((First + i) * VGA_MAX_FONT_HEIGHT + j) * VGA_NUM_BANKS + VGA_FONT_BANK] = FontData[i * Height + j];
         }
 
         /* Clear the unused part */
         for (j = Height; j < VGA_MAX_FONT_HEIGHT; j++)
         {
-            VgaMemory[(i * VGA_MAX_FONT_HEIGHT + j) * VGA_NUM_BANKS + VGA_FONT_BANK] = 0;
+            VgaMemory[((First + i) * VGA_MAX_FONT_HEIGHT + j) * VGA_NUM_BANKS + VGA_FONT_BANK] = 0;
         }
     }
 }
 
-BOOLEAN VgaInitialize(HANDLE TextHandle)
+VOID VgaWriteTextModeFont(UINT FontNumber, CONST UCHAR* FontData, UINT Height)
 {
-    if (!VgaConsoleInitialize(TextHandle)) return FALSE;
+    UNREFERENCED_PARAMETER(FontNumber);
+    VgaWriteTextModeFontRange(0, VGA_FONT_CHARACTERS, Height, FontData);
+}
+
+BOOLEAN VgaInitialize(VOID)
+{
+    if (!VgaConsoleInitialize()) return FALSE;
 
     /* Clear the SEQ, GC, CRTC and AC registers */
     RtlZeroMemory(VgaSeqRegisters , sizeof(VgaSeqRegisters ));

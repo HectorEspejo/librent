@@ -54,6 +54,8 @@ list(APPEND SOURCE
     dos/dos32krnl/process.c
     dos/dem.c
     dos/mouse32.c
+    frontend/frontend.c
+    frontend/input.c
     ${CMAKE_CURRENT_BINARY_DIR}/command_com.c
     clock.c
     emulator.c
@@ -82,6 +84,10 @@ add_pch(ntvdm ntvdm.h SOURCE)
 if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
     target_compile_options(ntvdm PRIVATE -Wno-unused-but-set-global -Wno-multichar)
 endif()
+file(READ ${REACTOS_SOURCE_DIR}/LIBRENT_VERSION _librent_version)
+string(STRIP "${_librent_version}" _librent_version)
+target_compile_definitions(ntvdm PRIVATE LIBRENT_VERSION_STRING="${_librent_version}")
+
 set_module_type(ntvdm win32cui UNICODE)
 target_link_libraries(ntvdm fast486 ${PSEH_LIB})
 add_importlibs(ntvdm user32 gdi32 advapi32 comdlg32 msvcrt kernel32 ntdll)

@@ -37,7 +37,7 @@
 #include "hardware/sound/speaker.h"
 #include "hardware/video/svga.h"
 /**/
-#include "./console/video.h"
+#include "./frontend/frontend.h"
 /**/
 
 #include "vddsup.h"
@@ -49,7 +49,6 @@ LPVOID  BaseAddress = NULL;
 BOOLEAN VdmRunning  = TRUE;
 
 HANDLE VdmTaskEvent = NULL;
-static HANDLE InputThread = NULL;
 
 LPCWSTR ExceptionName[] =
 {
@@ -183,109 +182,6 @@ static VOID WINAPI PitChan2Out(LPVOID Param, BOOLEAN State)
     }
 }
 
-
-static DWORD
-WINAPI
-ConsoleEventThread(LPVOID Parameter)
-{
-    HANDLE ConsoleInput = (HANDLE)Parameter;
-    HANDLE WaitHandles[2];
-    DWORD  WaitResult;
-
-    /*
-     * For optimization purposes, Windows (and hence ReactOS, too, for
-     * compatibility reasons) uses a static buffer if no more than five
-     * input records are read. Otherwise a new buffer is used.
-     * The client-side expects that we know this behaviour.
-     * See consrv/coninput.c
-     *
-     * We exploit here this optimization by also using a buffer of 5 records.
-     */
-    INPUT_RECORD InputRecords[5];
-    ULONG NumRecords, i;
-
-    WaitHandles[0] = VdmTaskEvent;
-    WaitHandles[1] = GetConsoleInputWaitHandle();
-
-    while (VdmRunning)
-    {
-        /* Make sure the task event is signaled */
-        WaitResult = WaitForMultipleObjects(ARRAYSIZE(WaitHandles),
-                                            WaitHandles,
-                                            TRUE,
-                                            INFINITE);
-        switch (WaitResult)
-        {
-            case WAIT_OBJECT_0 + 0:
-            case WAIT_OBJECT_0 + 1:
-                break;
-            default:
-                return GetLastError();
-        }
-
-        /* Wait for an input record */
-        if (!ReadConsoleInputExW(ConsoleInput,
-                                 InputRecords,
-                                 ARRAYSIZE(InputRecords),
-                                 &NumRecords,
-                                 CONSOLE_READ_NOWAIT))
-        {
-            DWORD LastError = GetLastError();
-            DPRINT1("Error reading console input (0x%p, %lu) - Error %lu\n", ConsoleInput, NumRecords, LastError);
-            return LastError;
-        }
-
-        // ASSERT(NumRecords != 0);
-        if (NumRecords == 0)
-        {
-            DPRINT1("Got NumRecords == 0!\n");
-            continue;
-        }
-
-        /* Dispatch the events */
-        for (i = 0; i < NumRecords; i++)
-        {
-            /* Check the event type */
-            switch (InputRecords[i].EventType)
-            {
-                /*
-                 * Hardware events
-                 */
-                case KEY_EVENT:
-                    KeyboardEventHandler(&InputRecords[i].Event.KeyEvent);
-                    break;
-
-                case MOUSE_EVENT:
-                    MouseEventHandler(&InputRecords[i].Event.MouseEvent);
-                    break;
-
-                case WINDOW_BUFFER_SIZE_EVENT:
-                    ScreenEventHandler(&InputRecords[i].Event.WindowBufferSizeEvent);
-                    break;
-
-                /*
-                 * Interface events
-                 */
-                case MENU_EVENT:
-                    MenuEventHandler(&InputRecords[i].Event.MenuEvent);
-                    break;
-
-                case FOCUS_EVENT:
-                    FocusEventHandler(&InputRecords[i].Event.FocusEvent);
-                    break;
-
-                default:
-                    DPRINT1("Unknown input event type 0x%04x\n", InputRecords[i].EventType);
-                    break;
-            }
-        }
-
-        /* Let the console subsystem queue some new events */
-        Sleep(10);
-    }
-
-    return 0;
-}
 
 static VOID PauseEventThread(VOID)
 {
@@ -427,7 +323,7 @@ VOID MountFloppy(IN ULONG DiskNumber)
 
     RtlZeroMemory(&ofn, sizeof(ofn));
     ofn.lStructSize  = sizeof(ofn);
-    ofn.hwndOwner    = hConsoleWnd;
+    ofn.hwndOwner    = VgaConsoleGetWindow();
     ofn.lpstrTitle   = L"Select a virtual floppy image";
     ofn.Flags        = OFN_EXPLORER | OFN_ENABLESIZING | OFN_LONGNAMES | OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
 //  ofn.FlagsEx      = OFN_EX_NOPLACESBAR;
@@ -507,7 +403,7 @@ VOID EmulatorTerminate(VOID)
     VdmRunning = FALSE;
 }
 
-BOOLEAN EmulatorInitialize(HANDLE ConsoleInput, HANDLE ConsoleOutput)
+BOOLEAN EmulatorInitialize(VOID)
 {
     USHORT i;
 
@@ -555,24 +451,13 @@ BOOLEAN EmulatorInitialize(HANDLE ConsoleInput, HANDLE ConsoleOutput)
     KeyboardInit(0);
     MouseInit(1);
 
-    /**************** ATTACH INPUT WITH CONSOLE *****************/
     /* Create the task event */
     VdmTaskEvent = CreateEventW(NULL, TRUE, FALSE, NULL);
     ASSERT(VdmTaskEvent != NULL);
-
-    /* Start the input thread */
-    InputThread = CreateThread(NULL, 0, &ConsoleEventThread, ConsoleInput, 0, NULL);
-    if (InputThread == NULL)
-    {
-        wprintf(L"FATAL: Failed to create the console input thread.\n");
-        EmulatorCleanup();
-        return FALSE;
-    }
     ResumeEventThread();
-    /************************************************************/
 
     /* Initialize the VGA */
-    if (!VgaInitialize(ConsoleOutput))
+    if (!VgaInitialize())
     {
         wprintf(L"FATAL: Failed to initialize VGA support.\n");
         EmulatorCleanup();
@@ -641,10 +526,6 @@ VOID EmulatorCleanup(VOID)
     DiskCtrlCleanup();
 
     VgaCleanup();
-
-    /* Close the input thread handle */
-    if (InputThread != NULL) CloseHandle(InputThread);
-    InputThread = NULL;
 
     /* Close the task event */
     if (VdmTaskEvent != NULL) CloseHandle(VdmTaskEvent);

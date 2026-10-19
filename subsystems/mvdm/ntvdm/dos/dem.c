@@ -33,6 +33,7 @@
 #include "mouse32.h"
 
 #include "vddsup.h"
+#include "frontend/frontend.h"
 
 /*
  * EXPERIMENTAL!
@@ -394,7 +395,8 @@ Command:
     RtlCopyMemory(SEG_OFF_TO_PTR(DataStruct->CmdLineSeg, DataStruct->CmdLineOff + 1), CmdLine, DOS_CMDLINE_LENGTH);
 
 #ifndef STANDALONE
-    /* Update console title if we run in a separate console */
+    /* Update the VDM window title and, if separate, the console title */
+    VgaConsoleSetTitle(AppName);
     if (!HasConsole)
         SetConsoleTitleA(AppName);
 #endif

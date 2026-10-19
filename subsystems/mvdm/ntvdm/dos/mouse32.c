@@ -26,7 +26,7 @@
 #include "hardware/pic.h"
 #include "hardware/video/svga.h"
 /**/
-#include "../console/video.h"
+#include "../frontend/frontend.h"
 /**/
 
 #include "mouse32.h"
@@ -634,7 +634,11 @@ static VOID WINAPI DosMouseService(LPWORD Stack)
         case 0x01:
         {
             DriverState.ShowCount++;
-            if (DriverState.ShowCount == 1) PaintMouseCursor();
+            if (DriverState.ShowCount == 1)
+            {
+                VgaFrontendSetMouseCursor(TRUE);
+                PaintMouseCursor();
+            }
 
             break;
         }
@@ -643,7 +647,11 @@ static VOID WINAPI DosMouseService(LPWORD Stack)
         case 0x02:
         {
             DriverState.ShowCount--;
-            if (DriverState.ShowCount == 0) EraseMouseCursor();
+            if (DriverState.ShowCount == 0)
+            {
+                VgaFrontendSetMouseCursor(FALSE);
+                EraseMouseCursor();
+            }
 
             break;
         }

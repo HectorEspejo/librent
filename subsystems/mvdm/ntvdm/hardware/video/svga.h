@@ -401,9 +401,10 @@ VOID VgaRefreshDisplay(VOID);
 VOID FASTCALL VgaReadMemory(ULONG Address, PVOID Buffer, ULONG Size);
 BOOLEAN FASTCALL VgaWriteMemory(ULONG Address, PVOID Buffer, ULONG Size);
 VOID VgaWriteTextModeFont(UINT FontNumber, CONST UCHAR *FontData, UINT Height);
+VOID VgaWriteTextModeFontRange(UINT First, UINT Count, UINT Height, CONST UCHAR *FontData);
 VOID VgaClearMemory(VOID);
 
-BOOLEAN VgaInitialize(HANDLE TextHandle);
+BOOLEAN VgaInitialize(VOID);
 VOID VgaCleanup(VOID);
 
 #endif /* _SVGA_H_ */

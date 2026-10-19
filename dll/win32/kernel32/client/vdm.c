@@ -666,14 +666,15 @@ BaseGetVdmConfigInfo(IN LPCWSTR CommandLineReserved,
                      OUT PULONG VdmSize)
 {
     WCHAR Buffer[MAX_PATH];
+    WCHAR AppPath[MAX_PATH];
     WCHAR CommandLine[MAX_PATH * 2];
     ULONG Length;
 
     /* Clear the buffer in case we fail */
     CmdLineString->Buffer = 0;
 
-    /* Always return the same size: 16 Mb */
-    *VdmSize = 0x1000000;
+    /* The VDM reserves its own guest memory, no low-memory reservation */
+    *VdmSize = 0;
 
     /* Get the system directory */
     Length = GetSystemDirectoryW(Buffer, MAX_PATH);
@@ -681,6 +682,19 @@ BaseGetVdmConfigInfo(IN LPCWSTR CommandLineReserved,
     {
         /* Eliminate no path or path too big */
         SetLastError(ERROR_INVALID_NAME);
+        return FALSE;
+    }
+
+    /* Refuse to launch a VDM if the NTVDM executable is not installed */
+    if (_snwprintf(AppPath, ARRAYSIZE(AppPath), L"%s\\ntvdm.exe", Buffer) < 0)
+    {
+        SetLastError(ERROR_INVALID_NAME);
+        return FALSE;
+    }
+
+    if (GetFileAttributesW(AppPath) == INVALID_FILE_ATTRIBUTES)
+    {
+        SetLastError(ERROR_BAD_EXE_FORMAT);
         return FALSE;
     }
 
@@ -694,8 +708,8 @@ BaseGetVdmConfigInfo(IN LPCWSTR CommandLineReserved,
          */
         _snwprintf(CommandLine,
                    ARRAYSIZE(CommandLine),
-                   L"\"%s\\ntvdm.exe\" -i%lx %s%c",
-                   Buffer,
+                   L"\"%s\" -i%lx %s%c",
+                   AppPath,
                    DosSeqId,
                    (BinaryType == BINARY_TYPE_DOS) ? L" " : L"-w",
                    (BinaryType == BINARY_TYPE_SEPARATE_WOW) ? L's' : L' ');
@@ -708,8 +722,8 @@ BaseGetVdmConfigInfo(IN LPCWSTR CommandLineReserved,
          */
         _snwprintf(CommandLine,
                    ARRAYSIZE(CommandLine),
-                   L"\"%s\\ntvdm.exe\" %s%c",
-                   Buffer,
+                   L"\"%s\" %s%c",
+                   AppPath,
                    (BinaryType == BINARY_TYPE_DOS) ? L" " : L"-w",
                    (BinaryType == BINARY_TYPE_SEPARATE_WOW) ? L's' : L' ');
     }

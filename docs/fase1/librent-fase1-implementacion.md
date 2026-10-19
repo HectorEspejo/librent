@@ -328,10 +328,11 @@ de la confirmación del desarrollador.
 ## Pendientes y bloqueos
 
 - **CI del fork**: los workflows quedaron registrados con el push y `stale` y
-  `labeler` están `disabled_manually`. En la primera ejecución de `build.yml`
-  (run `39159359232`) cinco de los siete trabajos ya están en verde (GCC i386,
-  GCC amd64, Clang riscv64 ×2 y Clang ppc); Clang amd64 y Clang arm64 seguían
-  en curso al cerrar la sesión. Queda confirmarlos y anotar el resultado.
+  `labeler` están `disabled_manually`. La primera ejecución de `build.yml`
+  terminó con los **7 trabajos en verde** (runs `39159359232` por push y
+  `39159360559` por PR), incluidos Clang amd64 y Clang arm64. Las ejecuciones
+  de S2 (`39210541363` por push y `39210546391` por PR) quedaron en curso al
+  cerrar la sesión.
 - **Decisión del analista sobre la AC de validación de punteros** (desviación
   10): la comprobación literal no es alcanzable desde modo real de 16 bits.
   Opciones: reformular la AC (p. ej., validar el borde `FFFF:FFF0`), moverla a
